@@ -17,11 +17,143 @@ from __future__ import annotations
 from typing import Any, Dict
 from datetime import datetime
 import json
+import logging
+import os
 import pytz
 from orchestration_pipelines_lib.dag_generator.airflow_adapters.common_utils import dataproc_utils
 from orchestration_pipelines_lib.dag_generator.airflow_adapters.common_utils import gcs_utils
 from orchestration_pipelines_lib.utils.duration_utils import duration_to_timedelta
 from orchestration_pipelines_lib.utils.file_manager import FileManager
+
+
+def get_pipeline_metadata(dag: Any) -> tuple[str, str, str]:
+    """Extracts bundle_id, version_id, and pipeline_id from a DAG object's doc_md property.
+
+    Expects the structured JSON metadata to be present in `dag.doc_md`.
+    """
+    bundle_id = "unknown_bundle"
+    version_id = "unknown_version"
+    pipeline_id = dag.dag_id if dag and hasattr(
+        dag, "dag_id") else "unknown_pipeline"
+
+    if dag and hasattr(dag, "doc_md") and dag.doc_md:
+        try:
+            doc_data = json.loads(dag.doc_md)
+            if isinstance(doc_data, dict):
+                bundle_id = doc_data.get("op_bundle", bundle_id)
+                version_id = doc_data.get("op_version", version_id)
+                pipeline_id = doc_data.get("op_pipeline", pipeline_id)
+            else:
+                logging.warning("DAG '%s' doc_md is not a JSON dictionary: %s",
+                                pipeline_id, dag.doc_md)
+        except Exception as e:
+            logging.warning("Failed to parse 'doc_md' of DAG '%s' as JSON: %s",
+                            pipeline_id, e)
+
+    return bundle_id, version_id, pipeline_id
+
+
+def _upload_inline_query_to_gcs(dag: Any, query: str, gcs_bucket: str,
+                                logger: Any) -> str:
+    """Uploads the inline query string to GCS and returns its gs:// URI.
+
+    The path is derived from DAG metadata to ensure isolation.
+    """
+    from google.cloud import storage
+    import hashlib
+
+    if not gcs_bucket:
+        raise ValueError("GCS bucket must be specified for inline SQL upload.")
+
+    bundle_id, version_id, _ = get_pipeline_metadata(dag)
+
+    hash_value = hashlib.sha256(query.encode("utf-8")).hexdigest()
+
+    blob_name = f"data/{bundle_id}/versions/{version_id}/managed-temp/{hash_value}.sql"
+    gcs_uri = f"gs://{gcs_bucket}/{blob_name}"
+
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(gcs_bucket)
+    blob = bucket.blob(blob_name)
+
+    logger.info("Uploading inline query to %s during task execution...",
+                gcs_uri)
+    blob.upload_from_string(query)
+
+    return gcs_uri
+
+
+_dataproc_create_batch_inline_sql_operator_class = None
+
+
+def get_dataproc_create_batch_inline_sql_operator_class():
+    global _dataproc_create_batch_inline_sql_operator_class
+    if _dataproc_create_batch_inline_sql_operator_class is None:
+        from airflow.providers.google.cloud.operators.dataproc import DataprocCreateBatchOperator
+
+        class DataprocCreateBatchInlineSqlOperator(DataprocCreateBatchOperator
+                                                   ):
+
+            def __init__(self, *, query: str, gcs_bucket: str, **kwargs):
+                self.query = query
+                self.gcs_bucket = gcs_bucket
+                super().__init__(**kwargs)
+
+            def execute(self, context):
+                gcs_uri = _upload_inline_query_to_gcs(self.dag, self.query,
+                                                      self.gcs_bucket,
+                                                      self.log)
+
+                try:
+                    self.batch.spark_sql_batch.query_file_uri = gcs_uri
+                except AttributeError:
+                    if isinstance(self.batch, dict):
+                        self.batch.setdefault("spark_sql_batch",
+                                              {})["query_file_uri"] = gcs_uri
+                    else:
+                        raise
+
+                return super().execute(context)
+
+        _dataproc_create_batch_inline_sql_operator_class = DataprocCreateBatchInlineSqlOperator
+
+    return _dataproc_create_batch_inline_sql_operator_class
+
+
+_dataproc_submit_job_inline_sql_operator_class = None
+
+
+def get_dataproc_submit_job_inline_sql_operator_class():
+    global _dataproc_submit_job_inline_sql_operator_class
+    if _dataproc_submit_job_inline_sql_operator_class is None:
+        from airflow.providers.google.cloud.operators.dataproc import DataprocSubmitJobOperator
+
+        class DataprocSubmitJobInlineSqlOperator(DataprocSubmitJobOperator):
+
+            def __init__(self, *, query: str, gcs_bucket: str, **kwargs):
+                self.query = query
+                self.gcs_bucket = gcs_bucket
+                super().__init__(**kwargs)
+
+            def execute(self, context):
+                gcs_uri = _upload_inline_query_to_gcs(self.dag, self.query,
+                                                      self.gcs_bucket,
+                                                      self.log)
+
+                try:
+                    self.job.spark_sql_job.query_file_uri = gcs_uri
+                except AttributeError:
+                    if isinstance(self.job, dict):
+                        self.job.setdefault("spark_sql_job",
+                                            {})["query_file_uri"] = gcs_uri
+                    else:
+                        raise
+
+                return super().execute(context)
+
+        _dataproc_submit_job_inline_sql_operator_class = DataprocSubmitJobInlineSqlOperator
+
+    return _dataproc_submit_job_inline_sql_operator_class
 
 
 def create_dataproc_create_batch_operator_task(action: Dict[str, Any],
@@ -45,13 +177,19 @@ def create_dataproc_create_batch_operator_task(action: Dict[str, Any],
         if action.type in ("pyspark", "notebook"):
             wrapper_uri = gcs_utils.get_run_notebook_gcs_path()
             gcs_utils.upload_run_notebook_if_needed(wrapper_uri)
-            job_specific_config[
-                "pyspark_batch"] = dataproc_utils.get_pyspark_batch_config(
-                    action, wrapper_uri)
-        elif action.type == "sql":
+            job_specific_config["pyspark_batch"] = (
+                dataproc_utils.get_pyspark_batch_config(action, wrapper_uri))
+
+        operator_class = DataprocCreateBatchOperator
+        extra_kwargs = {}
+        if action.type == "sql":
             spark_sql_batch = {}
             if action.query:
-                spark_sql_batch["query_list"] = {"queries": [action.query]}
+                operator_class = get_dataproc_create_batch_inline_sql_operator_class(
+                )
+                extra_kwargs["query"] = action.query
+                extra_kwargs["gcs_bucket"] = os.environ.get("GCS_BUCKET")
+
             elif action.filename:
                 spark_sql_batch["query_file_uri"] = action.filename
             job_specific_config["spark_sql_batch"] = spark_sql_batch
@@ -70,19 +208,19 @@ def create_dataproc_create_batch_operator_task(action: Dict[str, Any],
                                         runtime_config=runtime_config,
                                         environment_config=environment_config,
                                         labels=action.labels)
-        return DataprocCreateBatchOperator(
+        return operator_class(
             task_id=action.name,
             region=action.region,
             project_id=pipeline.defaults.cloudDefault.project,
             batch=batch,
             batch_id=
             f"{action.name.lower().lstrip('_-').replace('_', '-')[:50]}-{uuid.uuid4().hex[:6]}",
-            execution_timeout=(duration_to_timedelta(action.executionTimeout)
-                               if action.executionTimeout else None),
+            execution_timeout=duration_to_timedelta(action.executionTimeout)
+            if action.executionTimeout else None,
             impersonation_chain=action.impersonationChain,
             doc_md=json.dumps({"op_action_name": action.name}),
             dag=dag,
-        )
+            **extra_kwargs)
     except Exception as e:
         print(f"Error creating task for action '{action.name}': {e}")
         raise
@@ -142,8 +280,7 @@ def create_bq_operation_task(action: Dict[str, Any], pipeline: Dict[str, Any],
             gcp_conn_id="google_cloud_default",
             impersonation_chain=action.impersonationChain,
             doc_md=json.dumps({"op_action_name": action.name}),
-            dag=dag,
-        )
+            dag=dag)
     except Exception as e:
         print(f"Error creating task for action '{action.name}': {e}")
         raise
@@ -193,10 +330,15 @@ def dataproc_ephemeral_task(action: Dict[str, Any], dag) -> TaskGroup:
                 "labels": action.labels
             }
 
+            operator_class = DataprocSubmitJobOperator
+            extra_kwargs = {}
             if action.type == "sql":
                 spark_sql_job = {}
                 if action.query:
-                    spark_sql_job["query_list"] = {"queries": [action.query]}
+                    operator_class = get_dataproc_submit_job_inline_sql_operator_class(
+                    )
+                    extra_kwargs["query"] = action.query
+                    extra_kwargs["gcs_bucket"] = os.environ.get("GCS_BUCKET")
                 elif action.filename:
                     spark_sql_job["query_file_uri"] = action.filename
                 if action.config.properties:
@@ -211,7 +353,7 @@ def dataproc_ephemeral_task(action: Dict[str, Any], dag) -> TaskGroup:
                     pyspark_job["python_file_uris"] = action.pyFiles
                 pyspark_job["properties"] = action.config.properties
                 job["pyspark_job"] = pyspark_job
-            submit_job = DataprocSubmitJobOperator(
+            submit_job = operator_class(
                 task_id=f"{action.name}_submit_job",
                 job=job,
                 execution_timeout=duration_to_timedelta(
@@ -221,7 +363,8 @@ def dataproc_ephemeral_task(action: Dict[str, Any], dag) -> TaskGroup:
                 project_id=action.config.project_id,
                 impersonation_chain=action.impersonationChain,
                 doc_md=json.dumps({"op_action_name": action.name}),
-                dag=dag)
+                dag=dag,
+                **extra_kwargs)
 
             delete_cluster = DataprocDeleteClusterOperator(
                 task_id=f"{action.name}_delete_cluster",
@@ -265,10 +408,15 @@ def dataproc_existing_cluster(action: Dict[str, Any], pipeline: Dict[str, Any],
             "labels": action.labels
         }
 
+        operator_class = DataprocSubmitJobOperator
+        extra_kwargs = {}
         if action.type == "sql":
             spark_sql_job = {}
             if action.query:
-                spark_sql_job["query_list"] = {"queries": [action.query]}
+                operator_class = get_dataproc_submit_job_inline_sql_operator_class(
+                )
+                extra_kwargs["query"] = action.query
+                extra_kwargs["gcs_bucket"] = os.environ.get("GCS_BUCKET")
             elif action.filename:
                 spark_sql_job["query_file_uri"] = action.filename
             if action.config.properties:
@@ -283,7 +431,7 @@ def dataproc_existing_cluster(action: Dict[str, Any], pipeline: Dict[str, Any],
                 job["pyspark_job"]["python_file_uris"] = action.pyFiles
             job["pyspark_job"]["properties"] = action.config.properties
 
-        return DataprocSubmitJobOperator(
+        return operator_class(
             task_id=action.name,
             job=job,
             execution_timeout=duration_to_timedelta(action.executionTimeout)
@@ -292,7 +440,8 @@ def dataproc_existing_cluster(action: Dict[str, Any], pipeline: Dict[str, Any],
             project_id=pipeline.defaults.cloudDefault.project,
             impersonation_chain=action.impersonationChain,
             doc_md=json.dumps({"op_action_name": action.name}),
-            dag=dag)
+            dag=dag,
+            **extra_kwargs)
     except Exception as e:
         print(f"Error creating task for action '{action.name}': {e}")
         raise
