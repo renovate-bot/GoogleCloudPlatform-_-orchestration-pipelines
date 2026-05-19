@@ -24,8 +24,9 @@ from airflow.operators.empty import EmptyOperator
 _ERROR_DAG_PREFIX = "ERROR__"
 
 
-def create(dag_base_id: str, error_message: str, tags: List[str],
-           doc_md: Optional[str]):
+def create(
+    dag_base_id: str, error_message: str, tags: List[str], doc_md: Optional[str]
+):
     """Creates a dummy Airflow DAG to surface parsing errors in the UI.
 
     Args:
@@ -44,12 +45,14 @@ def create(dag_base_id: str, error_message: str, tags: List[str],
     if doc_md:
         error_doc_md.update(json.loads(doc_md))
 
-    dag = DAG(dag_id=dag_id,
-              start_date=datetime(2023, 1, 1),
-              schedule=None,
-              catchup=False,
-              tags=tags,
-              doc_md=json.dumps(error_doc_md))
+    dag = DAG(
+        dag_id=dag_id,
+        start_date=datetime(2023, 1, 1),
+        schedule=None,
+        catchup=False,
+        tags=tags,
+        doc_md=json.dumps(error_doc_md),
+    )
 
     EmptyOperator(task_id="parsing_failed", dag=dag)
 

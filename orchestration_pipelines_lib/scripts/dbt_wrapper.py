@@ -17,9 +17,9 @@
 import logging
 
 
-def invoke_dbt_run(project_dir: str,
-                   profiles_dir: str,
-                   select_models: list = None):
+def invoke_dbt_run(
+    project_dir: str, profiles_dir: str, select_models: list = None
+):
     """Wraps dbtRunner to execute dbt commands programmatically.
 
     Args:
@@ -40,7 +40,11 @@ def invoke_dbt_run(project_dir: str,
 
     # Build Arguments
     cli_args = [
-        "run", "--project-dir", project_dir, "--profiles-dir", profiles_dir
+        "run",
+        "--project-dir",
+        project_dir,
+        "--profiles-dir",
+        profiles_dir,
     ]
 
     if select_models:

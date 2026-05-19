@@ -31,6 +31,7 @@ def upload_run_notebook_if_needed(gcs_path: str):
     blob_name = path_parts[1]
 
     from google.cloud import storage
+
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(blob_name)
@@ -63,7 +64,7 @@ def get_run_notebook_gcs_path() -> str:
     bucket_name = os.environ.get("GCS_BUCKET")
     if not bucket_name:
         raise ValueError(
-            "GCS_BUCKET environment variable not set. " \
+            "GCS_BUCKET environment variable not set. "
             "This is expected to be set in a Cloud Composer environment."
         )
     gcs_path = f"gs://{bucket_name}/{BLOB_NAME_CLUSTER}"
@@ -84,6 +85,7 @@ def get_gcs_file_content(gcs_path: str) -> str:
     bucket_name = path_parts[0]
     blob_name = path_parts[1]
     from google.cloud import storage
+
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(blob_name)

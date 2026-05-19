@@ -15,8 +15,9 @@
 """Module to manipulate versions of a bundle"""
 
 import logging
-from orchestration_pipelines_models.manifest.manifest import Manifest
+
 from orchestration_pipelines_lib.dag_generator import core
+from orchestration_pipelines_models.manifest.manifest import Manifest
 
 
 def get_versions_to_parse(pipeline_id: str, manifest: Manifest):
@@ -32,9 +33,11 @@ def get_versions_to_parse(pipeline_id: str, manifest: Manifest):
     """
     default_version = manifest.get_default_version()
     active_dag_versions = core.get_actively_running_versions(
-        pipeline_id, manifest.get_bundle_id())
+        pipeline_id, manifest.get_bundle_id()
+    )
     previous_default_versions = core.get_previous_default_versions(
-        pipeline_id, manifest.get_bundle_id())
+        pipeline_id, manifest.get_bundle_id()
+    )
     logging.info("Previous Default version: %s", previous_default_versions)
     logging.info("Active dag versions: %s", active_dag_versions)
     logging.info("Default version: %s", default_version)

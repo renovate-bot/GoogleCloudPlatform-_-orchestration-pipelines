@@ -39,11 +39,13 @@ def validate(pipeline_definition_file: str) -> None:
             definition file.
     """
     from orchestration_pipelines_lib.utils.file_manager import FileManager
+
     _read_parse_and_convert_pipeline(FileManager(), pipeline_definition_file)
 
 
-def generate(pipeline_definition_file: str,
-             globals_dict: Dict[str, Any] = None):
+def generate(
+    pipeline_definition_file: str, globals_dict: Dict[str, Any] = None
+):
     """Generates the DAG based on the input pipeline.
 
     Args:
@@ -54,6 +56,7 @@ def generate(pipeline_definition_file: str,
     """
     dag_id = os.path.splitext(os.path.basename(pipeline_definition_file))[0]
     from orchestration_pipelines_lib.utils.file_manager import FileManager
+
     _generate_dag(
         FileManager(),
         pipeline_definition_file,
@@ -64,10 +67,12 @@ def generate(pipeline_definition_file: str,
     )
 
 
-def generate_dags(data_root: str,
-                  bundle_id: str,
-                  pipeline_id: str,
-                  globals_dict: Dict[str, Any] = None):
+def generate_dags(
+    data_root: str,
+    bundle_id: str,
+    pipeline_id: str,
+    globals_dict: Dict[str, Any] = None,
+):
     """Validates and generates DAGs for all versions of a pipeline from a
     bundle.
 
@@ -102,7 +107,7 @@ def generate_dags(data_root: str,
                     pipeline_id=pipeline_id,
                     current_version=version,
                     bundle_id=bundle_id,
-                    local_data_root=data_root
+                    local_data_root=data_root,
                 )
             else:
                 versioned_file_manager.set_version(version)
@@ -118,8 +123,9 @@ def generate_dags(data_root: str,
             )
 
 
-def _read_parse_and_convert_pipeline(file_manager: FileManager,
-                                     pipeline_definition_path: str):
+def _read_parse_and_convert_pipeline(
+    file_manager: FileManager, pipeline_definition_path: str
+):
     """Reads, parses, and converts a pipeline definition to an internal model.
 
     Args:
@@ -183,24 +189,33 @@ def _generate_dag(
     try:
         # Step 1: Read, parse and convert pipeline to internal model
         internal_pipeline = _read_parse_and_convert_pipeline(
-            file_manager, pipeline_definition_path)
+            file_manager, pipeline_definition_path
+        )
 
         # Override dag_id to desired form
         internal_pipeline.metadata.pipelineId = dag_id
 
         # Step 2: Prepare metadata
-        schedule_trigger = next((t for t in internal_pipeline.triggers
-                                 if isinstance(t, ScheduleTriggerModel)), None)
+        schedule_trigger = next(
+            (
+                t
+                for t in internal_pipeline.triggers
+                if isinstance(t, ScheduleTriggerModel)
+            ),
+            None,
+        )
 
         if metadata:
             if metadata.is_paused() or not metadata.is_current():
                 internal_pipeline.triggers = []
             tags = metadata.generate_tags(
                 owner=internal_pipeline.metadata.owner,
-                customer_tags=internal_pipeline.metadata.tags)
+                customer_tags=internal_pipeline.metadata.tags,
+            )
             doc_md = metadata.generate_doc_md(
                 owner=internal_pipeline.metadata.owner,
-                schedule_trigger=schedule_trigger)
+                schedule_trigger=schedule_trigger,
+            )
         else:
             if internal_pipeline.metadata.tags:
                 tags.extend(internal_pipeline.metadata.tags)
@@ -239,13 +254,15 @@ def _generate_dag(
         error_doc_md = ""
         if metadata:
             error_tags = metadata.generate_tags(owner, customer_tags=None)
-            error_doc_md = metadata.generate_doc_md(owner,
-                                                    schedule_trigger=None)
+            error_doc_md = metadata.generate_doc_md(
+                owner, schedule_trigger=None
+            )
         elif internal_pipeline and internal_pipeline.metadata.tags:
             error_tags.extend(internal_pipeline.metadata.tags)
 
-        dummy_dag = create_dummy_dag(dag_id, error_message, error_tags,
-                                     error_doc_md)
+        dummy_dag = create_dummy_dag(
+            dag_id, error_message, error_tags, error_doc_md
+        )
         if globals_dict:
             globals_dict[dummy_dag.dag_id] = dummy_dag
         else:
@@ -279,9 +296,9 @@ def _generate_dag_for_version(
         PipelineMetadata,
     )
 
-    metadata = PipelineMetadata(pipeline_id=pipeline_id,
-                                manifest=manifest,
-                                version_id=version_id)
+    metadata = PipelineMetadata(
+        pipeline_id=pipeline_id, manifest=manifest, version_id=version_id
+    )
     _generate_dag(
         file_manager,
         f"{pipeline_id}.yml",

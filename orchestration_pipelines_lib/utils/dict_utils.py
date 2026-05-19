@@ -73,12 +73,16 @@ def normalize_struct(struct_msg: Message, target_message_class: Type[Message]):
     # 1. Get original dictionary from the Struct
     original_dict = struct_to_dict(struct_msg)
     # 2. Create a message and parse the dict into it.
-    return dict_to_struct(original_dict,
-                          target_message_class) if original_dict else None
+    return (
+        dict_to_struct(original_dict, target_message_class)
+        if original_dict
+        else None
+    )
 
 
-def dict_to_struct(message_dict: Dict[str, Any],
-                   target_message_class: Type[Message]):
+def dict_to_struct(
+    message_dict: Dict[str, Any], target_message_class: Type[Message]
+):
     """Parses a dictionary into a protobuf Message instance.
 
     Args:
@@ -90,5 +94,7 @@ def dict_to_struct(message_dict: Dict[str, Any],
         the dictionary.
     """
     parsed_message = target_message_class()
-    ParseDict(js_dict=message_dict, message=parsed_message._pb)  # pylint: disable=protected-access
+    ParseDict(
+        js_dict=message_dict, message=parsed_message._pb # pylint: disable=protected-access
+    )
     return parsed_message

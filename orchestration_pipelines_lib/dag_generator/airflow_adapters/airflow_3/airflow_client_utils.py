@@ -33,7 +33,8 @@ def get_airflow_api_client():
 
     if _CREDENTIALS is None:
         _CREDENTIALS, _ = google.auth.default(
-            scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
         _CREDENTIALS.refresh(Request())
     elif not _CREDENTIALS.valid:
         _CREDENTIALS.refresh(Request())

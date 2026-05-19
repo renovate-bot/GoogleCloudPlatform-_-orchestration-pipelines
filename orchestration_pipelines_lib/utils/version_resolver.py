@@ -31,10 +31,12 @@ logger = logging.getLogger(__name__)
 class VersionResolver:
     """Determines and validates the version for a pipeline execution."""
 
-    def __init__(self,
-                 dag_id: str,
-                 file_manager: FileManager,
-                 local_data_root: str = "/declarative_pipelines"):
+    def __init__(
+        self,
+        dag_id: str,
+        file_manager: FileManager,
+        local_data_root: str = "/declarative_pipelines",
+    ):
         """Initializes the VersionResolver.
 
         Args:
@@ -58,8 +60,9 @@ class VersionResolver:
             LookupError: If 'default_version' is missing or not a string.
         """
         # Construct the absolute path to the manifest file
-        manifest_path = path_utils.get_manifest_path(self._local_data_root,
-                                                     self._dag_id)
+        manifest_path = path_utils.get_manifest_path(
+            self._local_data_root, self._dag_id
+        )
         logger.info("Reading manifest from: %s", manifest_path)
         try:
             manifest_content = self._file_manager.read(manifest_path)
@@ -67,20 +70,27 @@ class VersionResolver:
         except (yaml.YAMLError, OrchestrationPipelinesFileReadError) as e:
             raise ValueError(
                 f"Failed to read or parse manifest for DAG '{self._dag_id}' "
-                f"at '{manifest_path}'") from e
+                f"at '{manifest_path}'"
+            ) from e
 
         if not isinstance(manifest, dict):
-            raise TypeError(f"Manifest at '{manifest_path}' is not a valid "
-                            "YAML dictionary.")
+            raise TypeError(
+                f"Manifest at '{manifest_path}' is not a valid "
+                "YAML dictionary."
+            )
 
         default_version = manifest.get("default_version")
         if not isinstance(default_version, str):
             raise LookupError(
                 f"'default_version' is missing or not a string in manifest "
-                f"for DAG '{self._dag_id}' at '{manifest_path}'")
+                f"for DAG '{self._dag_id}' at '{manifest_path}'"
+            )
 
-        logger.info("Found default_version: '%s' for DAG '%s'",
-                    default_version, self._dag_id)
+        logger.info(
+            "Found default_version: '%s' for DAG '%s'",
+            default_version,
+            self._dag_id,
+        )
         return default_version
 
     def _validate_version_exists(self, dag_version: str) -> None:
@@ -94,15 +104,18 @@ class VersionResolver:
                 not exist.
         """
         # Construct the absolute path to the versioned directory
-        version_path = path_utils.get_version_path(self._local_data_root,
-                                                   self._dag_id, dag_version)
-        logger.info("Validating existence of version path for: %s",
-                    version_path)
+        version_path = path_utils.get_version_path(
+            self._local_data_root, self._dag_id, dag_version
+        )
+        logger.info(
+            "Validating existence of version path for: %s", version_path
+        )
 
         if not self._file_manager.exists(version_path):
             raise OrchestrationPipelinesInvalidPathError(
                 f"Version '{dag_version}' for pipeline '{self._dag_id}' not "
-                f"found. Path does not exist: {version_path}")
+                f"found. Path does not exist: {version_path}"
+            )
         logger.info("Version path exists for: %s", version_path)
 
     def get_dag_version(self, params: Optional[Dict[str, Any]]) -> str:
@@ -120,16 +133,19 @@ class VersionResolver:
             The resolved and validated pipeline version string.
         """
         dag_version = None
-        if params and isinstance(params,
-                                 dict) and "pipeline_version" in params:
+        if params and isinstance(params, dict) and "pipeline_version" in params:
             dag_version = str(params["pipeline_version"])
             logger.info(
                 "Using pipeline_version from params: '%s' for DAG '%s'",
-                dag_version, self._dag_id)
+                dag_version,
+                self._dag_id,
+            )
         else:
             logger.info(
                 "pipeline_version not in params for DAG '%s'. "
-                "Reading from manifest.", self._dag_id)
+                "Reading from manifest.",
+                self._dag_id,
+            )
             dag_version = self._get_version_from_manifest()
 
         self._validate_version_exists(dag_version)

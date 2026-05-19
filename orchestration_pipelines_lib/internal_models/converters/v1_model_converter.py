@@ -31,6 +31,9 @@ from orchestration_pipelines_lib.internal_models import (
 from orchestration_pipelines_lib.internal_models import (
     triggers as internal_triggers,
 )
+from orchestration_pipelines_lib.internal_models.actions import (
+    DataprocGceExistingClusterConfigurationModel,
+)
 from orchestration_pipelines_lib.utils.dict_utils import (
     dict_to_struct,
     normalize_struct,
@@ -58,25 +61,33 @@ class ConverterV1ToInternal:
         self.file_manager = file_manager
 
     def _normalize_environment_config(
-            self, environment_config_msg: Message) -> EnvironmentConfig:
+        self, environment_config_msg: Message
+    ) -> EnvironmentConfig:
         from google.cloud.dataproc_v1.types.shared import EnvironmentConfig
+
         return normalize_struct(environment_config_msg, EnvironmentConfig)
 
     def _normalize_runtime_config(
-            self, runtime_config_msg: Message) -> RuntimeConfig:
+        self, runtime_config_msg: Message
+    ) -> RuntimeConfig:
         from google.cloud.dataproc_v1.types.shared import RuntimeConfig
+
         return normalize_struct(runtime_config_msg, RuntimeConfig)
 
     def _normalize_cluster_config(
-            self, cluster_config_msg: Message) -> ClusterConfig:
+        self, cluster_config_msg: Message
+    ) -> ClusterConfig:
         from google.cloud.dataproc_v1.types.clusters import ClusterConfig
+
         return normalize_struct(cluster_config_msg, ClusterConfig)
 
     def _normalize_workflow_invocation(
-            self, workflow_invocation_msg: Message) -> WorkflowInvocation:
+        self, workflow_invocation_msg: Message
+    ) -> WorkflowInvocation:
         from google.cloud.dataform_v1.types.dataform import (
             WorkflowInvocation,
         )
+
         return normalize_struct(workflow_invocation_msg, WorkflowInvocation)
 
     def _get_gce_cluster_config(self, resource_profile_msg: Message) -> Dict:
@@ -90,34 +101,46 @@ class ConverterV1ToInternal:
             A dictionary containing the parsed cluster configuration.
         """
         from google.cloud.dataproc_v1.types.clusters import ClusterConfig
+
         cluster_config = None
         config_type = resource_profile_msg.WhichOneof("config")
 
         if config_type == "inline":
             inline_config = resource_profile_msg.inline
-            cluster_config_msg = (inline_config.config if inline_config.config
-                                  else inline_config.cluster_config)
+            cluster_config_msg = (
+                inline_config.config
+                if inline_config.config
+                else inline_config.cluster_config
+            )
             cluster_config = self._normalize_cluster_config(cluster_config_msg)
         elif config_type in ["path", "external_config_path"]:
-            path = (resource_profile_msg.path if config_type == "path" else
-                    resource_profile_msg.external_config_path)
+            path = (
+                resource_profile_msg.path
+                if config_type == "path"
+                else resource_profile_msg.external_config_path
+            )
             path_to_read = self.file_manager.resolve_path(path)
             cluster_config_dict = yaml.safe_load(
-                self.file_manager.read(path_to_read))
+                self.file_manager.read(path_to_read)
+            )
             config_data = {}
-            if (isinstance(cluster_config_dict, dict)
-                    and "definition" in cluster_config_dict
-                    and isinstance(cluster_config_dict["definition"], dict)
-                    and "config" in cluster_config_dict["definition"]):
+            if (
+                isinstance(cluster_config_dict, dict)
+                and "definition" in cluster_config_dict
+                and isinstance(cluster_config_dict["definition"], dict)
+                and "config" in cluster_config_dict["definition"]
+            ):
                 config_data = cluster_config_dict["definition"]["config"]
 
             cluster_config = dict_to_struct(config_data, ClusterConfig)
         overrides = resource_profile_msg.overrides
         if cluster_config and overrides:
-            overrides_struct = (overrides.config if overrides.config else
-                                overrides.cluster_config)
-            normalized_config = self._normalize_cluster_config(
-                overrides_struct)
+            overrides_struct = (
+                overrides.config
+                if overrides.config
+                else overrides.cluster_config
+            )
+            normalized_config = self._normalize_cluster_config(overrides_struct)
             if normalized_config:
                 cluster_config._pb.MergeFrom(normalized_config._pb)
 
@@ -137,6 +160,7 @@ class ConverterV1ToInternal:
             An internal ResourceProfile model populated with the configuration.
         """
         from google.protobuf import struct_pb2
+
         runtime_config_msg = struct_pb2.Struct()
         environment_config_msg = struct_pb2.Struct()
         config_type = resource_profile_msg.WhichOneof("config")
@@ -146,27 +170,36 @@ class ConverterV1ToInternal:
             runtime_config_msg = inline_config.runtime_config
             environment_config_msg = inline_config.environment_config
         elif config_type in ["path", "external_config_path"]:
-            path = (resource_profile_msg.path if config_type == "path" else
-                    resource_profile_msg.external_config_path)
+            path = (
+                resource_profile_msg.path
+                if config_type == "path"
+                else resource_profile_msg.external_config_path
+            )
             resolved_path = self.file_manager.resolve_path(path)
             resolved_config = yaml.safe_load(
-                self.file_manager.read(resolved_path))
+                self.file_manager.read(resolved_path)
+            )
             config_definition = resolved_config.get("definition") or {}
             runtime_config_struct = struct_pb2.Struct()
             runtime_config_struct.update(
                 config_definition.get("runtimeConfig")
-                or config_definition.get("runtime_config") or {})
+                or config_definition.get("runtime_config")
+                or {}
+            )
             runtime_config_msg = runtime_config_struct
 
             environment_config_struct = struct_pb2.Struct()
             environment_config_struct.update(
                 config_definition.get("environmentConfig")
-                or config_definition.get("environment_config") or {})
+                or config_definition.get("environment_config")
+                or {}
+            )
             environment_config_msg = environment_config_struct
 
         runtime_config = self._normalize_runtime_config(runtime_config_msg)
         environment_config = self._normalize_environment_config(
-            environment_config_msg)
+            environment_config_msg
+        )
 
         overrides = resource_profile_msg.overrides
         if overrides:
@@ -174,22 +207,31 @@ class ConverterV1ToInternal:
             environment_overrides = overrides.environment_config
             if runtime_overrides and runtime_config:
                 normalized_runtime_overrides = self._normalize_runtime_config(
-                    runtime_overrides)
+                    runtime_overrides
+                )
                 if normalized_runtime_overrides:
                     runtime_config._pb.MergeFrom(
-                        normalized_runtime_overrides._pb)
+                        normalized_runtime_overrides._pb
+                    )
             if environment_overrides and environment_config:
                 normalized_environment_overrides = (
-                    self._normalize_environment_config(environment_overrides))
+                    self._normalize_environment_config(environment_overrides)
+                )
                 if normalized_environment_overrides:
                     environment_config._pb.MergeFrom(
-                        normalized_environment_overrides._pb)
+                        normalized_environment_overrides._pb
+                    )
 
         return internal_actions.ResourceProfile(
-            runtimeConfig=struct_to_dict(runtime_config._pb)
-            if runtime_config else {},
-            environmentConfig=struct_to_dict(environment_config._pb)
-            if environment_config else {})
+            runtimeConfig=(
+                struct_to_dict(runtime_config._pb) if runtime_config else {}
+            ),
+            environmentConfig=(
+                struct_to_dict(environment_config._pb)
+                if environment_config
+                else {}
+            ),
+        )
 
     def convert_to_internal_model(
         self, v1_pipeline_model: v1_pipeline_protos.OrchestrationPipeline
@@ -213,15 +255,19 @@ class ConverterV1ToInternal:
 
         v1_defaults = v1_pipeline_model.defaults
         internal_cloud_defaults = internal_pipeline.CloudDefaultsModel(
-            project=v1_defaults.project_id, region=v1_defaults.location)
+            project=v1_defaults.project_id, region=v1_defaults.location
+        )
 
         internal_exec_config_defaults = (
             internal_pipeline.ExecutionConfigDefaultsModel(
-                retries=v1_defaults.execution_config.retries))
+                retries=v1_defaults.execution_config.retries
+            )
+        )
 
         internal_defaults = internal_pipeline.DefaultsModel(
             cloudDefault=internal_cloud_defaults,
-            executionConfigDefault=internal_exec_config_defaults)
+            executionConfigDefault=internal_exec_config_defaults,
+        )
 
         internal_metadata = internal_pipeline.MetaDataModel(
             pipelineId=v1_pipeline_model.pipeline_id,
@@ -231,10 +277,12 @@ class ConverterV1ToInternal:
         )
 
         internal_notifications = self.convert_notifications(
-            v1_pipeline_model.notifications)
+            v1_pipeline_model.notifications
+        )
 
         runner_name = v1_pipeline_protos.PipelineRunner.Name(
-            v1_pipeline_model.runner).lower()
+            v1_pipeline_model.runner
+        ).lower()
 
         return internal_pipeline.PipelineModel(
             metadata=internal_metadata,
@@ -242,7 +290,8 @@ class ConverterV1ToInternal:
             runner=runner_name,
             triggers=internal_triggers_list,
             actions=internal_actions_list,
-            notifications=internal_notifications)
+            notifications=internal_notifications,
+        )
 
     def convert_notifications(
         self, notifications: v1_pipeline_protos.Notification
@@ -252,9 +301,11 @@ class ConverterV1ToInternal:
         on_pipeline_failure = None
         if notifications.HasField("on_pipeline_failure"):
             on_pipeline_failure = internal_pipeline.EmailNotificationModel(
-                email=list(notifications.on_pipeline_failure.email))
+                email=list(notifications.on_pipeline_failure.email)
+            )
         return internal_pipeline.NotificationModel(
-            onPipelineFailure=on_pipeline_failure)
+            onPipelineFailure=on_pipeline_failure
+        )
 
     def convert_trigger(
         self, trigger: v1_pipeline_protos.Trigger
@@ -268,21 +319,27 @@ class ConverterV1ToInternal:
                 startTime=schedule.start_time,
                 endTime=schedule.end_time,
                 catchup=schedule.catchup,
-                timezone=schedule.timezone)
+                timezone=schedule.timezone,
+            )
         raise TypeError(f"Unknown trigger type: {trigger_type}")
 
-    def convert_action(self, action: v1_pipeline_protos.Action,
-                       defaults: v1_pipeline_protos.Defaults,
-                       labels: dict[str, str]) -> internal_pipeline.AnyAction:
+    def convert_action(
+        self,
+        action: v1_pipeline_protos.Action,
+        defaults: v1_pipeline_protos.Defaults,
+        labels: dict[str, str],
+    ) -> internal_pipeline.AnyAction:
         action_type = action.WhichOneof("action")
         if action_type == "python":
             return self._convert_python_action(action.python)
         if action_type == "pyspark":
-            return self._convert_dataproc_action(action.pyspark, "pyspark",
-                                                 defaults, labels)
+            return self._convert_dataproc_action(
+                action.pyspark, "pyspark", defaults, labels
+            )
         if action_type == "notebook":
-            return self._convert_dataproc_action(action.notebook, "notebook",
-                                                 defaults, labels)
+            return self._convert_dataproc_action(
+                action.notebook, "notebook", defaults, labels
+            )
         if action_type == "sql":
             return self._convert_sql_action(action.sql, defaults, labels)
         if action_type == "pipeline":
@@ -298,8 +355,11 @@ class ConverterV1ToInternal:
     def _convert_python_action(
         self, action: v1_pipeline_protos.PythonAction
     ) -> internal_pipeline.AnyAction:
-        op_kwargs = struct_to_dict(action.op_kwargs) if action.HasField(
-            "op_kwargs") and action.op_kwargs else None
+        op_kwargs = (
+            struct_to_dict(action.op_kwargs)
+            if action.HasField("op_kwargs") and action.op_kwargs
+            else None
+        )
 
         if action.HasField("environment"):
             env = action.environment
@@ -312,7 +372,8 @@ class ConverterV1ToInternal:
                     requirements = list(reqs_wrapper.inline.list)
                 elif req_type == "path":
                     requirements_path = self.file_manager.extract_relative_path(
-                        self.file_manager.resolve_path(reqs_wrapper.path))
+                        self.file_manager.resolve_path(reqs_wrapper.path)
+                    )
 
             return internal_actions.PythonVirtualenvActionModel(
                 name=action.name,
@@ -326,7 +387,8 @@ class ConverterV1ToInternal:
                     requirementsPath=requirements_path,
                     requirements=requirements,
                     systemSitePackages=env.system_site_packages,
-                ))
+                ),
+            )
         else:
             return internal_actions.PythonScriptActionModel(
                 name=action.name,
@@ -337,12 +399,16 @@ class ConverterV1ToInternal:
                 config=internal_actions.PythonScriptConfigurationModel(
                     pythonCallable=action.python_callable,
                     opKwargs=op_kwargs,
-                ))
+                ),
+            )
 
     def _convert_dataproc_action(
-        self, action, action_type: str, defaults: v1_pipeline_protos.Defaults,
-        labels: Dict[str,
-                     str]) -> internal_actions.DataprocOperatorActionModel:
+        self,
+        action,
+        action_type: str,
+        defaults: v1_pipeline_protos.Defaults,
+        labels: Dict[str, str],
+    ) -> internal_actions.DataprocOperatorActionModel:
         engine_type = action.engine.WhichOneof("engine")
         internal_engine = None
         internal_config = None
@@ -357,21 +423,23 @@ class ConverterV1ToInternal:
                 region = config.location or defaults.location
                 impersonation_chain = list(config.impersonation_chain)
                 internal_engine = internal_actions.EngineModel(
-                    engineType="dataproc-gce", clusterMode="existing")
-                internal_config = (
-                    internal_actions.
-                    DataprocGceExistingClusterConfigurationModel(
-                        cluster_name=config.cluster_name,
-                        project_id=config.project_id or defaults.project_id,
-                        properties=config.properties))
+                    engineType="dataproc-gce", clusterMode="existing"
+                )
+                internal_config = DataprocGceExistingClusterConfigurationModel(
+                    cluster_name=config.cluster_name,
+                    project_id=config.project_id or defaults.project_id,
+                    properties=config.properties,
+                )
             elif config_type == "ephemeral_cluster":
                 config = gce_engine.ephemeral_cluster
                 region = config.location or defaults.location
                 impersonation_chain = list(config.impersonation_chain)
                 internal_engine = internal_actions.EngineModel(
-                    engineType="dataproc-gce", clusterMode="ephemeral")
+                    engineType="dataproc-gce", clusterMode="ephemeral"
+                )
                 cluster_config = self._get_gce_cluster_config(
-                    config.resource_profile)
+                    config.resource_profile
+                )
 
                 internal_config = (
                     internal_actions.DataprocEphemeralConfigurationModel(
@@ -379,19 +447,25 @@ class ConverterV1ToInternal:
                         project_id=config.project_id or defaults.project_id,
                         cluster_name=config.cluster_name,
                         cluster_config=cluster_config,
-                        properties=config.properties))
+                        properties=config.properties,
+                    )
+                )
         elif engine_type == "dataproc_serverless":
             config = action.engine.dataproc_serverless
             region = config.location or defaults.location
             impersonation_chain = list(config.impersonation_chain)
             internal_engine = internal_actions.EngineModel(
-                engineType="dataproc-serverless")
+                engineType="dataproc-serverless"
+            )
             resource_profile = self._get_serverless_resource_profile(
-                config.resource_profile)
+                config.resource_profile
+            )
 
             internal_config = (
                 internal_actions.DataprocCreateBatchOperatorConfigurationModel(
-                    resourceProfile=resource_profile))
+                    resourceProfile=resource_profile
+                )
+            )
 
         return internal_actions.DataprocOperatorActionModel(
             name=action.name,
@@ -410,12 +484,15 @@ class ConverterV1ToInternal:
             archives=list(action.archive_uris),
             depsBucket=action.staging_bucket,
             engine=internal_engine,
-            config=internal_config)
+            config=internal_config,
+        )
 
     def _convert_sql_action(
-            self, action: v1_pipeline_protos.SqlAction,
-            defaults: v1_pipeline_protos.Defaults,
-            labels: Dict[str, str]) -> internal_pipeline.AnyAction:
+        self,
+        action: v1_pipeline_protos.SqlAction,
+        defaults: v1_pipeline_protos.Defaults,
+        labels: Dict[str, str],
+    ) -> internal_pipeline.AnyAction:
         engine_type = action.engine.WhichOneof("engine")
         query_type = action.query.WhichOneof("query")
         query = None
@@ -444,18 +521,23 @@ class ConverterV1ToInternal:
                 config=internal_actions.BqOperationConfigurationModel(
                     location=bq_engine.location or defaults.location,
                     destinationTable=bq_engine.destination_table,
-                ))
+                ),
+            )
         if engine_type == "dataproc_serverless":
             config = action.engine.dataproc_serverless
             region = config.location or defaults.location
             impersonation_chain = list(config.impersonation_chain)
             internal_engine = internal_actions.EngineModel(
-                engineType="dataproc-serverless")
+                engineType="dataproc-serverless"
+            )
             resource_profile = self._get_serverless_resource_profile(
-                config.resource_profile)
+                config.resource_profile
+            )
             internal_config = (
                 internal_actions.DataprocCreateBatchOperatorConfigurationModel(
-                    resourceProfile=resource_profile))
+                    resourceProfile=resource_profile
+                )
+            )
 
             return internal_actions.DataprocOperatorActionModel(
                 name=action.name,
@@ -468,7 +550,8 @@ class ConverterV1ToInternal:
                 region=region,
                 impersonationChain=impersonation_chain,
                 engine=internal_engine,
-                config=internal_config)
+                config=internal_config,
+            )
 
         if engine_type == "dataproc_on_gce":
             gce_engine = action.engine.dataproc_on_gce
@@ -483,21 +566,23 @@ class ConverterV1ToInternal:
                 region = config.location or defaults.location
                 impersonation_chain = list(config.impersonation_chain)
                 internal_engine = internal_actions.EngineModel(
-                    engineType="dataproc-gce", clusterMode="existing")
-                internal_config = (
-                    internal_actions.
-                    DataprocGceExistingClusterConfigurationModel(
-                        cluster_name=config.cluster_name,
-                        project_id=config.project_id or defaults.project_id,
-                        properties=config.properties))
+                    engineType="dataproc-gce", clusterMode="existing"
+                )
+                internal_config = DataprocGceExistingClusterConfigurationModel(
+                    cluster_name=config.cluster_name,
+                    project_id=config.project_id or defaults.project_id,
+                    properties=config.properties,
+                )
             elif config_type == "ephemeral_cluster":
                 config = gce_engine.ephemeral_cluster
                 region = config.location or defaults.location
                 impersonation_chain = list(config.impersonation_chain)
                 internal_engine = internal_actions.EngineModel(
-                    engineType="dataproc-gce", clusterMode="ephemeral")
+                    engineType="dataproc-gce", clusterMode="ephemeral"
+                )
                 cluster_config = self._get_gce_cluster_config(
-                    config.resource_profile)
+                    config.resource_profile
+                )
 
                 internal_config = (
                     internal_actions.DataprocEphemeralConfigurationModel(
@@ -505,7 +590,9 @@ class ConverterV1ToInternal:
                         project_id=config.project_id or defaults.project_id,
                         cluster_name=config.cluster_name,
                         cluster_config=cluster_config,
-                        properties=config.properties))
+                        properties=config.properties,
+                    )
+                )
 
             return internal_actions.DataprocOperatorActionModel(
                 name=action.name,
@@ -518,7 +605,8 @@ class ConverterV1ToInternal:
                 region=region,
                 impersonationChain=impersonation_chain,
                 engine=internal_engine,
-                config=internal_config)
+                config=internal_config,
+            )
 
         raise TypeError(f"Unknown SQL engine type: {engine_type}")
 
@@ -543,8 +631,11 @@ class ConverterV1ToInternal:
                     executionMode="local",
                     source=internal_actions.DbtLocalExecutionModel(
                         path=self.file_manager.resolve_path(
-                            airflow_worker.project_directory_path)),
-                    select_models=list(airflow_worker.select_models))
+                            airflow_worker.project_directory_path
+                        )
+                    ),
+                    select_models=list(airflow_worker.select_models),
+                )
         elif framework_type == "dataform":
             dataform = action.framework.dataform
             execution_type = dataform.WhichOneof("execution")
@@ -566,7 +657,8 @@ class ConverterV1ToInternal:
             if execution_type == "dataform_service":
                 service = dataform.dataform_service
                 workflow_invocation = self._normalize_workflow_invocation(
-                    service.workflow_invocation)
+                    service.workflow_invocation
+                )
                 return internal_actions.DataformActionModel(
                     name=action.name,
                     executionTimeout=action.execution_timeout or None,
@@ -599,10 +691,7 @@ class ConverterV1ToInternal:
                 raise ValueError("BigQueryDtsSpec requires a transfer_config.")
 
             runtime_params = None
-            if (
-                dts_spec.HasField("runtime_params")
-                and dts_spec.runtime_params
-            ):
+            if dts_spec.HasField("runtime_params") and dts_spec.runtime_params:
                 runtime_params = struct_to_dict(dts_spec.runtime_params)
 
             impersonation_chain = None

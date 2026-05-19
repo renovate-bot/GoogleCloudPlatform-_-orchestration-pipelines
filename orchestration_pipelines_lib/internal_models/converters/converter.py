@@ -41,6 +41,7 @@ def convert(model, file_manager: FileManager) -> InternalModel:
     """
     if isinstance(model, V1Model):
         return ConverterV1ToInternal(file_manager).convert_to_internal_model(
-            model)
+            model
+        )
 
     raise TypeError(f"Unknown model type: {type(model)}")

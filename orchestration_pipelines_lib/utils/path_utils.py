@@ -29,8 +29,9 @@ def get_manifest_path(local_data_root: str, bundle_id: str) -> str:
     return os.path.join(local_data_root, bundle_id, "manifest.yml")
 
 
-def get_version_path(local_data_root: str, dag_id: str,
-                     dag_version: str) -> str:
+def get_version_path(
+    local_data_root: str, dag_id: str, dag_version: str
+) -> str:
     """Constructs the path to a specific version directory of a pipeline.
 
     Args:
@@ -44,8 +45,9 @@ def get_version_path(local_data_root: str, dag_id: str,
     return os.path.join(local_data_root, dag_id, "versions", dag_version)
 
 
-def resolve_versioned_path(local_data_root: str, bundle_id: str,
-                           version_id: str, file_path: str) -> str:
+def resolve_versioned_path(
+    local_data_root: str, bundle_id: str, version_id: str, file_path: str
+) -> str:
     """Resolves a relative path to an absolute, versioned path.
 
     Path is resolved to:
@@ -61,5 +63,7 @@ def resolve_versioned_path(local_data_root: str, bundle_id: str,
         The normalized absolute versioned path.
     """
     return os.path.normpath(
-        os.path.join(local_data_root, bundle_id, "versions", version_id,
-                     file_path))
+        os.path.join(
+            local_data_root, bundle_id, "versions", version_id, file_path
+        )
+    )

@@ -56,13 +56,16 @@ class VersionedFileManager(FileManager):
         super().__init__(gcs_client)
         if not pipeline_id:
             raise OrchestrationPipelinesInitializationError(
-                "pipeline_id cannot be empty.")
+                "pipeline_id cannot be empty."
+            )
         if not current_version:
             raise OrchestrationPipelinesInitializationError(
-                "current_version cannot be empty.")
+                "current_version cannot be empty."
+            )
         if not bundle_id:
             raise OrchestrationPipelinesInitializationError(
-                "bundle_id cannot be empty.")
+                "bundle_id cannot be empty."
+            )
         self._pipeline_id = pipeline_id
         self._current_version = current_version
         self.bundle_id = bundle_id
@@ -94,7 +97,7 @@ class VersionedFileManager(FileManager):
             current_version=current_version,
             bundle_id=bundle_id,
             local_data_root=local_data_root,
-            gcs_client=base_manager._gcs_client  # pylint: disable=protected-access
+            gcs_client=base_manager._gcs_client,  # pylint: disable=protected-access
         )
 
     def set_version(self, version_id: str):
@@ -121,10 +124,12 @@ class VersionedFileManager(FileManager):
             return file_path
         if os.path.isabs(file_path):
             return file_path
-        return path_utils.resolve_versioned_path(self._local_data_root,
-                                                 self.bundle_id,
-                                                 self._current_version,
-                                                 file_path)
+        return path_utils.resolve_versioned_path(
+            self._local_data_root,
+            self.bundle_id,
+            self._current_version,
+            file_path,
+        )
 
     def extract_relative_path(self, full_path, _=None):
         """Resolves to a relative path from full path based on the version.

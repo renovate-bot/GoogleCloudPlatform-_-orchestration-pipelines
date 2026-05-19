@@ -36,7 +36,8 @@ def import_callable(path: str, function: str) -> Any:
         if not os.path.exists(module_path):
             raise ImportError(f"Module file not found at: {module_path}")
         module_spec = importlib.util.spec_from_file_location(
-            "test_script_1", module_path)
+            "test_script_1", module_path
+        )
         if not module_spec:
             raise ImportError(f"Cannot find spec for module at {module_path}.")
         module = importlib.util.module_from_spec(module_spec)
@@ -44,11 +45,17 @@ def import_callable(path: str, function: str) -> Any:
         module_spec.loader.exec_module(module)
         if not hasattr(module, function):
             raise AttributeError(
-                f"Module {module_path} has no attribute '{function}'")
+                f"Module {module_path} has no attribute '{function}'"
+            )
         return getattr(module, function)
     except (ImportError, AttributeError) as e:
-        logging.error("Failed to import callable '%s' from '%s': %s", function,
-                      path, e)
+        logging.error(
+            "Failed to import callable '%s' from '%s': %s", function, path, e
+        )
     except Exception as e:  # pylint: disable=broad-exception-caught
-        logging.error("Unexpected error importing callable '%s' from '%s': %s",
-                      function, path, e)
+        logging.error(
+            "Unexpected error importing callable '%s' from '%s': %s",
+            function,
+            path,
+            e,
+        )

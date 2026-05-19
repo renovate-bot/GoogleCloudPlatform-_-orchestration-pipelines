@@ -14,7 +14,6 @@
 #
 """Module with common conversion methods from action into Airflow code."""
 
-
 from __future__ import annotations
 
 import json
@@ -46,8 +45,9 @@ def get_pipeline_metadata(dag: Any) -> tuple[str, str, str]:
     """
     bundle_id = "unknown_bundle"
     version_id = "unknown_version"
-    pipeline_id = dag.dag_id if dag and hasattr(
-        dag, "dag_id") else "unknown_pipeline"
+    pipeline_id = (
+        dag.dag_id if dag and hasattr(dag, "dag_id") else "unknown_pipeline"
+    )
 
     if dag and hasattr(dag, "doc_md") and dag.doc_md:
         try:
@@ -57,17 +57,24 @@ def get_pipeline_metadata(dag: Any) -> tuple[str, str, str]:
                 version_id = doc_data.get("op_version", version_id)
                 pipeline_id = doc_data.get("op_pipeline", pipeline_id)
             else:
-                logging.warning("DAG '%s' doc_md is not a JSON dictionary: %s",
-                                pipeline_id, dag.doc_md)
+                logging.warning(
+                    "DAG '%s' doc_md is not a JSON dictionary: %s",
+                    pipeline_id,
+                    dag.doc_md,
+                )
         except Exception as e:  # pylint: disable=broad-exception-caught
-            logging.warning("Failed to parse 'doc_md' of DAG '%s' as JSON: %s",
-                            pipeline_id, e)
+            logging.warning(
+                "Failed to parse 'doc_md' of DAG '%s' as JSON: %s",
+                pipeline_id,
+                e,
+            )
 
     return bundle_id, version_id, pipeline_id
 
 
-def _upload_inline_query_to_gcs(dag: Any, query: str, gcs_bucket: str,
-                                logger: Any) -> str:
+def _upload_inline_query_to_gcs(
+    dag: Any, query: str, gcs_bucket: str, logger: Any
+) -> str:
     """Uploads the inline query string to GCS and returns its gs:// URI.
 
     The path is derived from DAG metadata to ensure isolation.
@@ -84,8 +91,7 @@ def _upload_inline_query_to_gcs(dag: Any, query: str, gcs_bucket: str,
     hash_value = hashlib.sha256(query.encode("utf-8")).hexdigest()
 
     blob_name = (
-        f"data/{bundle_id}/versions/{version_id}/"
-        f"managed-temp/{hash_value}.sql"
+        f"data/{bundle_id}/versions/{version_id}/managed-temp/{hash_value}.sql"
     )
     gcs_uri = f"gs://{gcs_bucket}/{blob_name}"
 
@@ -93,8 +99,9 @@ def _upload_inline_query_to_gcs(dag: Any, query: str, gcs_bucket: str,
     bucket = storage_client.bucket(gcs_bucket)
     blob = bucket.blob(blob_name)
 
-    logger.info("Uploading inline query to %s during task execution...",
-                gcs_uri)
+    logger.info(
+        "Uploading inline query to %s during task execution...", gcs_uri
+    )
     blob.upload_from_string(query)
 
     return gcs_uri
@@ -119,16 +126,17 @@ def get_dataproc_create_batch_inline_sql_operator_class():
                 super().__init__(**kwargs)
 
             def execute(self, context):
-                gcs_uri = _upload_inline_query_to_gcs(self.dag, self.query,
-                                                      self.gcs_bucket,
-                                                      self.log)
+                gcs_uri = _upload_inline_query_to_gcs(
+                    self.dag, self.query, self.gcs_bucket, self.log
+                )
 
                 try:
                     self.batch.spark_sql_batch.query_file_uri = gcs_uri
                 except AttributeError:
                     if isinstance(self.batch, dict):
-                        self.batch.setdefault("spark_sql_batch",
-                                              {})["query_file_uri"] = gcs_uri
+                        self.batch.setdefault("spark_sql_batch", {})[
+                            "query_file_uri"
+                        ] = gcs_uri
                     else:
                         raise
 
@@ -160,16 +168,17 @@ def get_dataproc_submit_job_inline_sql_operator_class():
                 super().__init__(**kwargs)
 
             def execute(self, context):
-                gcs_uri = _upload_inline_query_to_gcs(self.dag, self.query,
-                                                      self.gcs_bucket,
-                                                      self.log)
+                gcs_uri = _upload_inline_query_to_gcs(
+                    self.dag, self.query, self.gcs_bucket, self.log
+                )
 
                 try:
                     self.job.spark_sql_job.query_file_uri = gcs_uri
                 except AttributeError:
                     if isinstance(self.job, dict):
-                        self.job.setdefault("spark_sql_job",
-                                            {})["query_file_uri"] = gcs_uri
+                        self.job.setdefault("spark_sql_job", {})[
+                            "query_file_uri"
+                        ] = gcs_uri
                     else:
                         raise
 
@@ -182,8 +191,9 @@ def get_dataproc_submit_job_inline_sql_operator_class():
     return _dataproc_submit_job_inline_sql_operator_class
 
 
-def create_dataproc_create_batch_operator_task(action: Dict[str, Any],
-                                               pipeline: Dict[str, Any], dag):
+def create_dataproc_create_batch_operator_task(
+    action: Dict[str, Any], pipeline: Dict[str, Any], dag
+):
     """Converts an action into a DataprocCreateBatchOperator.
 
     Args:
@@ -207,7 +217,8 @@ def create_dataproc_create_batch_operator_task(action: Dict[str, Any],
             wrapper_uri = gcs_utils.get_run_notebook_gcs_path()
             gcs_utils.upload_run_notebook_if_needed(wrapper_uri)
             job_specific_config["pyspark_batch"] = (
-                dataproc_utils.get_pyspark_batch_config(action, wrapper_uri))
+                dataproc_utils.get_pyspark_batch_config(action, wrapper_uri)
+            )
 
         operator_class = DataprocCreateBatchOperator
         extra_kwargs = {}
@@ -232,14 +243,17 @@ def create_dataproc_create_batch_operator_task(action: Dict[str, Any],
         if action.type in ("pyspark", "notebook"):
             deps_bucket = action.depsBucket or ""
             execution_config = environment_config.setdefault(
-                "execution_config", {})
+                "execution_config", {}
+            )
             if execution_config.get("staging_bucket") is None and deps_bucket:
                 execution_config["staging_bucket"] = deps_bucket
 
-        batch = dataproc_v1.types.Batch(**job_specific_config,
-                                        runtime_config=runtime_config,
-                                        environment_config=environment_config,
-                                        labels=action.labels)
+        batch = dataproc_v1.types.Batch(
+            **job_specific_config,
+            runtime_config=runtime_config,
+            environment_config=environment_config,
+            labels=action.labels,
+        )
         return operator_class(
             task_id=action.name,
             region=action.region,
@@ -264,8 +278,9 @@ def create_dataproc_create_batch_operator_task(action: Dict[str, Any],
         raise
 
 
-def create_bq_operation_task(action: Dict[str, Any], pipeline: Dict[str, Any],
-                             dag):
+def create_bq_operation_task(
+    action: Dict[str, Any], pipeline: Dict[str, Any], dag
+):
     """Converts an action into a BigQueryInsertJobOperator.
 
     Args:
@@ -292,7 +307,7 @@ def create_bq_operation_task(action: Dict[str, Any], pipeline: Dict[str, Any],
                 "query": query,
                 "useLegacySql": False,
             },
-            "labels": action.labels
+            "labels": action.labels,
         }
         if not query.strip().upper().startswith("CREATE"):
             configuration["query"]["writeDisposition"] = "WRITE_TRUNCATE"
@@ -316,12 +331,16 @@ def create_bq_operation_task(action: Dict[str, Any], pipeline: Dict[str, Any],
             location=action.config.location,
             project_id=pipeline.defaults.cloudDefault.project,
             configuration=configuration,
-            execution_timeout=duration_to_timedelta(action.executionTimeout)
-            if action.executionTimeout else None,
+            execution_timeout=(
+                duration_to_timedelta(action.executionTimeout)
+                if action.executionTimeout
+                else None
+            ),
             gcp_conn_id="google_cloud_default",
             impersonation_chain=action.impersonationChain,
             doc_md=json.dumps({"op_action_name": action.name}),
-            dag=dag)
+            dag=dag,
+        )
     except Exception:
         logging.exception("Error creating task for action '%s'", action.name)
         raise
@@ -361,16 +380,15 @@ def dataproc_ephemeral_task(action: Dict[str, Any], dag) -> TaskGroup:
                 impersonation_chain=action.impersonationChain,
                 doc_md=json.dumps({"op_action_name": action.name}),
                 labels=action.labels,
-                dag=dag)
+                dag=dag,
+            )
 
             job = {
-                "placement": {
-                    "cluster_name": action.config.cluster_name
-                },
+                "placement": {"cluster_name": action.config.cluster_name},
                 "reference": {
                     "project_id": action.config.project_id,
                 },
-                "labels": action.labels
+                "labels": action.labels,
             }
 
             operator_class = DataprocSubmitJobOperator
@@ -392,7 +410,8 @@ def dataproc_ephemeral_task(action: Dict[str, Any], dag) -> TaskGroup:
                 wrapper_uri = gcs_utils.get_run_notebook_gcs_path()
                 gcs_utils.upload_run_notebook_if_needed(wrapper_uri)
                 pyspark_job = dataproc_utils.get_pyspark_batch_config(
-                    action, wrapper_uri)
+                    action, wrapper_uri
+                )
                 if action.pyFiles:
                     pyspark_job["python_file_uris"] = action.pyFiles
                 pyspark_job["properties"] = action.config.properties
@@ -400,15 +419,18 @@ def dataproc_ephemeral_task(action: Dict[str, Any], dag) -> TaskGroup:
             submit_job = operator_class(
                 task_id=f"{action.name}_submit_job",
                 job=job,
-                execution_timeout=duration_to_timedelta(
-                    action.executionTimeout)
-                if action.executionTimeout else None,
+                execution_timeout=(
+                    duration_to_timedelta(action.executionTimeout)
+                    if action.executionTimeout
+                    else None
+                ),
                 region=action.config.region,
                 project_id=action.config.project_id,
                 impersonation_chain=action.impersonationChain,
                 doc_md=json.dumps({"op_action_name": action.name}),
                 dag=dag,
-                **extra_kwargs)
+                **extra_kwargs,
+            )
 
             delete_cluster = DataprocDeleteClusterOperator(
                 task_id=f"{action.name}_delete_cluster",
@@ -418,7 +440,8 @@ def dataproc_ephemeral_task(action: Dict[str, Any], dag) -> TaskGroup:
                 impersonation_chain=action.impersonationChain,
                 doc_md=json.dumps({"op_action_name": action.name}),
                 dag=dag,
-                trigger_rule=TriggerRule.ALL_DONE)
+                trigger_rule=TriggerRule.ALL_DONE,
+            )
 
             # pylint: disable=pointless-statement
             create_cluster >> submit_job >> delete_cluster
@@ -428,8 +451,9 @@ def dataproc_ephemeral_task(action: Dict[str, Any], dag) -> TaskGroup:
         raise
 
 
-def dataproc_existing_cluster(action: Dict[str, Any], pipeline: Dict[str, Any],
-                              dag):
+def dataproc_existing_cluster(
+    action: Dict[str, Any], pipeline: Dict[str, Any], dag
+):
     """Converts action into DataprocSubmitJobOperator for existing
     cluster.
 
@@ -447,13 +471,11 @@ def dataproc_existing_cluster(action: Dict[str, Any], pipeline: Dict[str, Any],
 
     try:
         job = {
-            "placement": {
-                "cluster_name": action.config.cluster_name
-            },
+            "placement": {"cluster_name": action.config.cluster_name},
             "reference": {
                 "project_id": action.config.project_id,
             },
-            "labels": action.labels
+            "labels": action.labels,
         }
 
         operator_class = DataprocSubmitJobOperator
@@ -475,7 +497,8 @@ def dataproc_existing_cluster(action: Dict[str, Any], pipeline: Dict[str, Any],
             wrapper_uri = gcs_utils.get_run_notebook_gcs_path()
             gcs_utils.upload_run_notebook_if_needed(wrapper_uri)
             job["pyspark_job"] = dataproc_utils.get_pyspark_batch_config(
-                action, wrapper_uri)
+                action, wrapper_uri
+            )
             if action.pyFiles:
                 job["pyspark_job"]["python_file_uris"] = action.pyFiles
             job["pyspark_job"]["properties"] = action.config.properties
@@ -483,14 +506,18 @@ def dataproc_existing_cluster(action: Dict[str, Any], pipeline: Dict[str, Any],
         return operator_class(
             task_id=action.name,
             job=job,
-            execution_timeout=duration_to_timedelta(action.executionTimeout)
-            if action.executionTimeout else None,
+            execution_timeout=(
+                duration_to_timedelta(action.executionTimeout)
+                if action.executionTimeout
+                else None
+            ),
             region=action.region,
             project_id=pipeline.defaults.cloudDefault.project,
             impersonation_chain=action.impersonationChain,
             doc_md=json.dumps({"op_action_name": action.name}),
             dag=dag,
-            **extra_kwargs)
+            **extra_kwargs,
+        )
     except Exception:
         logging.exception("Error creating task for action '%s'", action.name)
         raise
@@ -504,8 +531,11 @@ def create_schedule_trigger_task(dag_kwargs, schedule_trigger):
         schedule_trigger: The schedule trigger configuration object.
     """
     start_time = datetime.fromisoformat(schedule_trigger.startTime)
-    end_time = datetime.fromisoformat(
-        schedule_trigger.endTime) if schedule_trigger.endTime else None
+    end_time = (
+        datetime.fromisoformat(schedule_trigger.endTime)
+        if schedule_trigger.endTime
+        else None
+    )
     timezone = pytz.timezone(schedule_trigger.timezone)
     dag_kwargs["start_date"] = timezone.localize(start_time)
     dag_kwargs["end_date"] = timezone.localize(end_time) if end_time else None
@@ -513,8 +543,9 @@ def create_schedule_trigger_task(dag_kwargs, schedule_trigger):
     dag_kwargs["catchup"] = schedule_trigger.catchup
 
 
-def create_dataproc_operator_task(action: Dict[str, Any],
-                                  pipeline: Dict[str, Any], dag):
+def create_dataproc_operator_task(
+    action: Dict[str, Any], pipeline: Dict[str, Any], dag
+):
     """Converts an action into a specific Dataproc operator or task group.
 
     Args:
@@ -534,18 +565,18 @@ def create_dataproc_operator_task(action: Dict[str, Any],
         elif action.engine.clusterMode == "ephemeral":
             return dataproc_ephemeral_task(action, dag=dag)
     elif action.engine.engineType == "dataproc-serverless":
-        return create_dataproc_create_batch_operator_task(action,
-                                                          pipeline,
-                                                          dag=dag)
+        return create_dataproc_create_batch_operator_task(
+            action, pipeline, dag=dag
+        )
 
     raise ValueError(
-        f"Unsupported notebook configuration for action {action.name}")
+        f"Unsupported notebook configuration for action {action.name}"
+    )
 
 
-def _get_config_or_default(config_obj,
-                           pipeline,
-                           action_attribute,
-                           pipeline_attribute=None):
+def _get_config_or_default(
+    config_obj, pipeline, action_attribute, pipeline_attribute=None
+):
     """Retrieves a configuration value or falls back to the pipeline default.
 
     Args:
@@ -565,8 +596,9 @@ def _get_config_or_default(config_obj,
     return getattr(pipeline.defaults.cloudDefault, pipeline_attribute)
 
 
-def create_service_dataform_task(action: Dict[str, Any],
-                                 pipeline: Dict[str, Any], dag):
+def create_service_dataform_task(
+    action: Dict[str, Any], pipeline: Dict[str, Any], dag
+):
     """Converts an action into a DataformCreateWorkflowInvocationOperator.
 
     Args:
@@ -583,20 +615,30 @@ def create_service_dataform_task(action: Dict[str, Any],
 
     return DataformCreateWorkflowInvocationOperator(
         task_id=action.name,
-        project_id=_get_config_or_default(action.dataformServiceConfig,
-                                          pipeline, "project_id", "project"),
-        region=_get_config_or_default(action.dataformServiceConfig, pipeline,
-                                      "region"),
-        execution_timeout=duration_to_timedelta(action.executionTimeout)
-        if action.executionTimeout else None,
+        project_id=_get_config_or_default(
+            action.dataformServiceConfig, pipeline, "project_id", "project"
+        ),
+        region=_get_config_or_default(
+            action.dataformServiceConfig, pipeline, "region"
+        ),
+        execution_timeout=(
+            duration_to_timedelta(action.executionTimeout)
+            if action.executionTimeout
+            else None
+        ),
         repository_id=action.dataformServiceConfig.repository_id,
         workflow_invocation=action.dataformServiceConfig.workflow_invocation,
         doc_md=json.dumps({"op_action_name": action.name}),
-        dag=dag)
+        dag=dag,
+    )
 
 
-def create_local_dataform_task(action: Dict[str, Any], _: Dict[str, Any],
-                               gcs_bucket_path_template: str, dag):
+def create_local_dataform_task(
+    action: Dict[str, Any],
+    _: Dict[str, Any],
+    gcs_bucket_path_template: str,
+    dag,
+):
     """Converts an action into a KubernetesPodOperator for a Dataform workflow.
 
     Args:
@@ -717,7 +759,8 @@ def create_bq_dts_task(
                 transfer_config_id=action.config.transferConfigId,
                 run_id=(
                     "{{ task_instance.xcom_pull("
-                    f"task_ids='{action.name}.{action.name}_start', key='run_id')"
+                    f"task_ids='{action.name}."
+                    f"{action.name}_start', key='run_id')"
                     " }}"
                 ),
                 project_id=project_id,

@@ -28,8 +28,9 @@ from orchestration_pipelines_lib.internal_models.triggers import (
 from . import airflow_client_utils, email_utils, task_factory
 
 
-def _update_metadata(dag_run, dag, additional_notes, dag_run_api,
-                     task_instance_api):
+def _update_metadata(
+    dag_run, dag, additional_notes, dag_run_api, task_instance_api
+):
     """Updates DAG run and task instance metadata notes with retry."""
     import airflow_client.client
     from airflow_client.client.exceptions import ServiceException
@@ -47,18 +48,20 @@ def _update_metadata(dag_run, dag, additional_notes, dag_run_api,
     )
     def _do_update():
         # 1. Update/Insert DAG RUN Note
-        dag_run_api.patch_dag_run(dag_id=dag_run.dag_id,
-                                  dag_run_id=dag_run.run_id,
-                                  dag_run_patch_body={"note": additional_notes},
-                                  update_mask=["note"])
+        dag_run_api.patch_dag_run(
+            dag_id=dag_run.dag_id,
+            dag_run_id=dag_run.run_id,
+            dag_run_patch_body={"note": additional_notes},
+            update_mask=["note"],
+        )
 
         # 2. Update/Insert TASK INSTANCE Note
         task_instances = task_instance_api.get_task_instances(
-            dag_id=dag_run.dag_id, dag_run_id=dag_run.run_id).task_instances
+            dag_id=dag_run.dag_id, dag_run_id=dag_run.run_id
+        ).task_instances
 
         existing_notes_map = {
-            (ti.task_id, ti.map_index): ti.note
-            for ti in task_instances
+            (ti.task_id, ti.map_index): ti.note for ti in task_instances
         }
 
         doc_md_map = {t.task_id: t.doc_md for t in dag.tasks}
@@ -70,25 +73,27 @@ def _update_metadata(dag_run, dag, additional_notes, dag_run_api,
                 continue
 
             existing_note = existing_notes_map.get(
-                (task_instance.task_id, task_instance.map_index))
+                (task_instance.task_id, task_instance.map_index)
+            )
 
             if existing_note and existing_note == new_content:
                 continue
 
-            entities.append({
-                "task_id": task_instance.task_id,
-                "note": new_content
-            })
+            entities.append(
+                {"task_id": task_instance.task_id, "note": new_content}
+            )
 
         if entities:
             batch_body = (
                 airflow_client.client.BulkBodyBulkTaskInstanceBody.from_dict(
                     {
-                        "actions": [{
-                            "action": "update",
-                            "action_on_non_existence": "skip",
-                            "entities": entities
-                        }]
+                        "actions": [
+                            {
+                                "action": "update",
+                                "action_on_non_existence": "skip",
+                                "entities": entities,
+                            }
+                        ]
                     }
                 )
             )
@@ -138,8 +143,7 @@ def init_orchestration_pipeline_context(note_content: str, **context):
                 "op_is_current",
             ]
             notes_dict = {
-                k: v
-                for k, v in notes_data.items() if k in allowed_keys
+                k: v for k, v in notes_data.items() if k in allowed_keys
             }
             if notes_dict:
                 additional_notes = json.dumps(notes_dict, indent=4)
@@ -149,8 +153,9 @@ def init_orchestration_pipeline_context(note_content: str, **context):
     task_instance_api = airflow_client.client.TaskInstanceApi(api_client)
 
     try:
-        _update_metadata(dag_run, dag, additional_notes, dag_run_api,
-                         task_instance_api)
+        _update_metadata(
+            dag_run, dag, additional_notes, dag_run_api, task_instance_api
+        )
     except ApiException as e:
         print(
             "Failed when calling Airflow Python Client API during "
@@ -181,6 +186,7 @@ def generate(
     """
     from airflow.providers.standard.operators.python import PythonOperator
     from airflow.sdk import DAG
+
     # Defines list of non-relative path to the additional folders where
     # jinja will look for templates. For example, .txt file format is
     # treated as jinja template. By default, it searches in
@@ -193,7 +199,8 @@ def generate(
 
     schedule_trigger = next(
         (t for t in pipeline.triggers if isinstance(t, ScheduleTriggerModel)),
-        None)
+        None,
+    )
 
     dag_kwargs = {
         "dag_id": pipeline.metadata.pipelineId,
@@ -209,7 +216,8 @@ def generate(
     if pipeline.notifications and pipeline.notifications.onPipelineFailure:
         emails = pipeline.notifications.onPipelineFailure.email
         on_failure_callback = partial(
-            email_utils.send_failure_notification_email, emails)
+            email_utils.send_failure_notification_email, emails
+        )
         dag_kwargs["on_failure_callback"] = on_failure_callback
 
     if schedule_trigger:
@@ -221,10 +229,12 @@ def generate(
 
     dag = DAG(**dag_kwargs)
 
-    _ = PythonOperator(task_id="init_orchestration_pipeline_context",
-                       python_callable=init_orchestration_pipeline_context,
-                       op_args=[dag_notes],
-                       dag=dag)
+    _ = PythonOperator(
+        task_id="init_orchestration_pipeline_context",
+        python_callable=init_orchestration_pipeline_context,
+        op_args=[dag_notes],
+        dag=dag,
+    )
 
     tasks = {}
     # 2. Create tasks in a task group and explicitly associate them with the dag
@@ -244,7 +254,8 @@ def generate(
                 if dep_name not in tasks:
                     raise ValueError(
                         f"Task {dep_name} being upstream dependency for "
-                        f"{action.name} does not exist.")
+                        f"{action.name} does not exist."
+                    )
 
                 upstream_task = tasks[dep_name]
                 # Relationships are safely set on the objects directly
@@ -252,8 +263,9 @@ def generate(
     return dag
 
 
-def get_actively_running_versions(pipeline_id: str,
-                                  bundle_id: str) -> list[str]:
+def get_actively_running_versions(
+    pipeline_id: str, bundle_id: str
+) -> list[str]:
     """Retrieves a list of actively running versions for a given pipeline.
 
     Queries the Airflow API to find any DAG runs currently in 'running' or
@@ -290,8 +302,9 @@ def get_actively_running_versions(pipeline_id: str,
     return list(version_ids)
 
 
-def get_previous_default_versions(pipeline_id: str,
-                                  bundle_id: str) -> list[str]:
+def get_previous_default_versions(
+    pipeline_id: str, bundle_id: str
+) -> list[str]:
     """Retrieves a list of previous default versions for a given pipeline.
 
     Queries the Airflow API for DAGs tagged as current for the specific
@@ -305,19 +318,22 @@ def get_previous_default_versions(pipeline_id: str,
 
     versions = set()
     try:
-        response = dag_api.get_dags(tags=[
-            "op:is_current", f"op:bundle:{bundle_id}",
-            f"op:pipeline:{pipeline_id}"
-        ],
-                                    tags_match_mode="all")
+        response = dag_api.get_dags(
+            tags=[
+                "op:is_current",
+                f"op:bundle:{bundle_id}",
+                f"op:pipeline:{pipeline_id}",
+            ],
+            tags_match_mode="all",
+        )
 
         if response.dags:
             for dag in response.dags:
                 if dag.tags:
                     for tag in dag.tags:
-                        if hasattr(
-                                tag,
-                                "name") and tag.name.startswith("op:version:"):
+                        if hasattr(tag, "name") and tag.name.startswith(
+                            "op:version:"
+                        ):
                             version_id = tag.name.split("op:version:")[1]
                             if version_id:
                                 versions.add(version_id)

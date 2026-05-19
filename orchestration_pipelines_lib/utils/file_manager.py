@@ -24,22 +24,27 @@ from typing import Any, Optional
 
 _GCS_CLIENT = None
 
+
 def _get_gcs_client():
     global _GCS_CLIENT
     if _GCS_CLIENT is None:
         from google.cloud import storage
+
         _GCS_CLIENT = storage.Client()
     return _GCS_CLIENT
 
 
 class OrchestrationPipelinesFileReadError(Exception):
     """Base exception for file reading issues within the library."""
+
     pass
 
 
 class OrchestrationPipelinesFileNotFoundError(
-        OrchestrationPipelinesFileReadError):
+    OrchestrationPipelinesFileReadError
+):
     """Indicates that the resolved file or location does not exist."""
+
     pass
 
 
@@ -47,11 +52,13 @@ class OrchestrationPipelinesInitializationError(Exception):
     """Error while initializing a class from the orchestration pipelines
     library.
     """
+
     pass
 
 
 class OrchestrationPipelinesInvalidPathError(ValueError):
     """Indicates an invalid file path format."""
+
     pass
 
 
@@ -74,6 +81,7 @@ class FileManager:
         """Lazily initializes the GCS client."""
         if self._gcs_client is None:
             from google.cloud import storage
+
             self._gcs_client = storage.Client()
         return self._gcs_client
 
@@ -88,9 +96,9 @@ class FileManager:
         """
         return file_path
 
-    def extract_relative_path(self,
-                              full_path: str,
-                              local_data_root: str = "/") -> str:
+    def extract_relative_path(
+        self, full_path: str, local_data_root: str = "/"
+    ) -> str:
         """Returns the relative path from full_path without local_data_root.
 
         Path is resolved from:
@@ -142,13 +150,16 @@ class FileManager:
                 return f.read()
         except FileNotFoundError as e:
             raise OrchestrationPipelinesFileNotFoundError(
-                f"File '{full_path}' does not exist.") from e
+                f"File '{full_path}' does not exist."
+            ) from e
         except IsADirectoryError as e:
             raise OrchestrationPipelinesInvalidPathError(
-                f"'{full_path}' is not a file.") from e
+                f"'{full_path}' is not a file."
+            ) from e
         except Exception as e:
             raise OrchestrationPipelinesFileReadError(
-                f"Error reading local file '{path}': {e}") from e
+                f"Error reading local file '{path}': {e}"
+            ) from e
 
     def _parse_gcs_uri(self, gcs_uri: str) -> tuple[str, str]:
         """Parses a GCS URI into bucket name and blob path.
@@ -165,18 +176,21 @@ class FileManager:
         """
         if not gcs_uri.startswith("gs://"):
             raise OrchestrationPipelinesInvalidPathError(
-                f"Invalid GCS URI format: {gcs_uri}")
+                f"Invalid GCS URI format: {gcs_uri}"
+            )
         try:
             parts = gcs_uri[5:].split("/", 1)
             bucket_name = parts[0]
             if not bucket_name:
                 raise OrchestrationPipelinesInvalidPathError(
-                    f"Missing bucket name in GCS URI: {gcs_uri}")
+                    f"Missing bucket name in GCS URI: {gcs_uri}"
+                )
             blob_path = parts[1] if len(parts) > 1 else ""
             return bucket_name, blob_path
         except IndexError as e:
             raise OrchestrationPipelinesInvalidPathError(
-                f"Invalid GCS URI format: {gcs_uri}") from e
+                f"Invalid GCS URI format: {gcs_uri}"
+            ) from e
 
     def _read_gcs_file(self, gcs_uri: str) -> str:
         """Reads content from a Google Cloud Storage object.
@@ -202,11 +216,14 @@ class FileManager:
             return blob.download_as_text()
         except Exception as e:
             from google.api_core import exceptions
+
             if isinstance(e, exceptions.NotFound):
                 raise OrchestrationPipelinesFileNotFoundError(
-                    f"GCS object '{gcs_uri}' does not exist.") from e
+                    f"GCS object '{gcs_uri}' does not exist."
+                ) from e
             raise OrchestrationPipelinesFileReadError(
-                f"Error accessing GCS object '{gcs_uri}': {e}") from e
+                f"Error accessing GCS object '{gcs_uri}': {e}"
+            ) from e
 
     def read_absolute_path(self, path: str) -> str:
         """Reads the content of a file from an absolute path.
@@ -228,13 +245,16 @@ class FileManager:
                 return f.read()
         except FileNotFoundError as e:
             raise OrchestrationPipelinesFileNotFoundError(
-                f"File '{path}' does not exist.") from e
+                f"File '{path}' does not exist."
+            ) from e
         except IsADirectoryError as e:
             raise OrchestrationPipelinesInvalidPathError(
-                f"'{path}' is not a file.") from e
+                f"'{path}' is not a file."
+            ) from e
         except Exception as e:
             raise OrchestrationPipelinesFileReadError(
-                f"Error reading local file '{path}': {e}") from e
+                f"Error reading local file '{path}': {e}"
+            ) from e
 
     def read(self, file_path: str) -> str:
         """Reads the content of a file from a given path.
@@ -280,12 +300,15 @@ class FileManager:
                     return True
 
                 # For non-root prefixes, check for objects under it.
-                prefix = blob_path if blob_path.endswith(
-                    "/") else blob_path + "/"
+                prefix = (
+                    blob_path if blob_path.endswith("/") else blob_path + "/"
+                )
                 return any(bucket.list_blobs(prefix=prefix, max_results=1))
             else:
                 return os.path.exists(self._construct_local_path(file_path))
-        except Exception:  # pylint: disable=broad-exception-caught  # Includes GCS errors and invalid paths
+        except (
+            Exception  # pylint: disable=broad-exception-caught
+        ):  # Includes GCS errors and invalid paths
             return False
 
     def get_blob_reference(self, resolved_path: str) -> str:
@@ -311,7 +334,8 @@ class FileManager:
         """
         if not self.exists(resolved_path):
             raise OrchestrationPipelinesFileNotFoundError(
-                f"File not found: '{resolved_path}'")
+                f"File not found: '{resolved_path}'"
+            )
 
         if self._is_gcs_blob(resolved_path):
             return resolved_path

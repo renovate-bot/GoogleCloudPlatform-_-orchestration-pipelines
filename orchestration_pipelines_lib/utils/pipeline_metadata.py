@@ -54,7 +54,8 @@ class PipelineMetadata:
         attributes.
         """
         deployment_details = self._manifest.get_deployment_details(
-            self._version_id)
+            self._version_id
+        )
 
         self._origination = ""
         self._repo = ""
@@ -64,7 +65,8 @@ class PipelineMetadata:
         if deployment_details:
             if deployment_details.origination is not None:
                 self._origination = DeploymentOrigination.Name(
-                    deployment_details.origination)
+                    deployment_details.origination
+                )
             else:
                 self._origination = ""
             self._repo = deployment_details.git_repo or ""
@@ -87,8 +89,9 @@ class PipelineMetadata:
         """
         return self._is_current
 
-    def generate_tags(self, owner: Optional[str],
-                      customer_tags: Optional[List[str]]) -> List[str]:
+    def generate_tags(
+        self, owner: Optional[str], customer_tags: Optional[List[str]]
+    ) -> List[str]:
         """Generates a list of tags for the DAG.
 
         Args:
@@ -100,14 +103,21 @@ class PipelineMetadata:
         """
         owner = owner or ""
         customer_tags = customer_tags or []
-        registered_tag_prefixes = ("op:bundle", "op:version", "op:pipeline",
-                                   "op:owner", "op:origination",
-                                   "op:is_paused", "op:is_current",
-                                   "op:orchestration_pipeline")
+        registered_tag_prefixes = (
+            "op:bundle",
+            "op:version",
+            "op:pipeline",
+            "op:owner",
+            "op:origination",
+            "op:is_paused",
+            "op:is_current",
+            "op:orchestration_pipeline",
+        )
 
         # Filter out registered tags from customer tags
         filtered_customer_tags = [
-            tag for tag in customer_tags
+            tag
+            for tag in customer_tags
             if not tag.startswith(registered_tag_prefixes)
         ]
 
@@ -128,8 +138,10 @@ class PipelineMetadata:
         return filtered_customer_tags + orchestration_tags
 
     def generate_doc_md(
-            self, owner: Optional[str],
-            schedule_trigger: Optional[ScheduleTriggerModel]) -> str:
+        self,
+        owner: Optional[str],
+        schedule_trigger: Optional[ScheduleTriggerModel],
+    ) -> str:
         """Generates a JSON string for the DAG's doc_md.
 
         Args:

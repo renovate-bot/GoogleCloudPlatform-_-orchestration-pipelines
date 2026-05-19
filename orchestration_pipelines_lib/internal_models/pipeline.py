@@ -58,12 +58,14 @@ class RunnerType(str, Enum):
 @dataclass
 class ExecutionConfigDefaultsModel:
     """Default execution configuration for actions within the pipeline."""
+
     retries: int
 
 
 @dataclass
 class CloudDefaultsModel:
     """Default cloud provider settings for the pipeline."""
+
     project: str
     region: str
 
@@ -71,6 +73,7 @@ class CloudDefaultsModel:
 @dataclass
 class DefaultsModel:
     """Encapsulates all default settings for the pipeline."""
+
     cloudDefault: CloudDefaultsModel
     executionConfigDefault: ExecutionConfigDefaultsModel
 
@@ -78,6 +81,7 @@ class DefaultsModel:
 @dataclass
 class MetaDataModel:
     """Metadata for the pipeline."""
+
     pipelineId: str
     description: str
     owner: str
@@ -87,12 +91,14 @@ class MetaDataModel:
 @dataclass
 class EmailNotificationModel:
     """Model for email notifications."""
+
     email: List[str]
 
 
 @dataclass
 class NotificationModel:
     """Model containing various notification configurations."""
+
     onPipelineFailure: Optional[EmailNotificationModel] = None
     onPipelineSuccess: Optional[EmailNotificationModel] = None
     onPipelineComplete: Optional[EmailNotificationModel] = None
@@ -101,6 +107,7 @@ class NotificationModel:
 @dataclass
 class PipelineModel:
     """The root model representing a full orchestration pipeline."""
+
     defaults: DefaultsModel
     metadata: MetaDataModel
     runner: RunnerType

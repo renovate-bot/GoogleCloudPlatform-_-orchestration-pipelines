@@ -150,6 +150,7 @@ class DataformServiceModel:
 @dataclass
 class DataformActionModel(ActionBaseModel):
     """Internal model representing a Dataform action."""
+
     type: Literal["dataform_pipeline"]
     executionMode: Literal["local", "service"]
     dataform_project_path: Optional[str] = None
@@ -160,6 +161,7 @@ class DataformActionModel(ActionBaseModel):
 @dataclass
 class BigQueryDtsSpecModel:
     """BigQuery DTS spec model."""
+
     transferConfigId: str
     runtimeParams: Optional[Dict[str, Any]] = None
     impersonationChain: Optional[Union[str, List[str]]] = None
@@ -170,6 +172,7 @@ class BigQueryDtsSpecModel:
 @dataclass
 class DataIngestionActionModel(ActionBaseModel):
     """Internal model representing a Data Ingestion action."""
+
     type: Literal["data_ingestion"]
     config: BigQueryDtsSpecModel
     labels: Optional[Dict[str, str]] = None

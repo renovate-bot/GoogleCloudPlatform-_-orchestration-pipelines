@@ -45,6 +45,7 @@ def init_orchestration_pipeline_context(note_content: str, **context):
     from airflow.models.taskinstance import TaskInstanceNote
     from airflow.utils.session import create_session
     from sqlalchemy.exc import IntegrityError
+
     dag_run = context.get("dag_run")
     dag = context.get("dag")
     # Filter note_content to keep only specific fields
@@ -65,16 +66,18 @@ def init_orchestration_pipeline_context(note_content: str, **context):
                 "op_is_current",
             ]
             notes_dict = {
-                k: v
-                for k, v in notes_data.items() if k in allowed_keys
+                k: v for k, v in notes_data.items() if k in allowed_keys
             }
             if notes_dict:
                 additional_notes = json.dumps(notes_dict, indent=4)
     with create_session() as session:
         try:
             # 1. Update/Insert DAG RUN Note (Single query/operation)
-            dr_note = session.query(DagRunNote).filter_by(
-                dag_run_id=dag_run.id).first()
+            dr_note = (
+                session.query(DagRunNote)
+                .filter_by(dag_run_id=dag_run.id)
+                .first()
+            )
             if dr_note:
                 if dr_note.content != additional_notes:
                     dr_note.content = additional_notes
@@ -85,24 +88,34 @@ def init_orchestration_pipeline_context(note_content: str, **context):
                 new_dr_note.content = additional_notes
                 session.add(new_dr_note)
             # 2. Update/Insert TASK INSTANCE Note
-            task_instance_existing_notes = session.query(
-                TaskInstanceNote).filter(
+            task_instance_existing_notes = (
+                session.query(TaskInstanceNote)
+                .filter(
                     TaskInstanceNote.dag_id == dag_run.dag_id,
-                    TaskInstanceNote.run_id == dag_run.run_id).all()
+                    TaskInstanceNote.run_id == dag_run.run_id,
+                )
+                .all()
+            )
             existing_notes_map = {
                 (n.task_id, n.map_index): n
                 for n in task_instance_existing_notes
             }
             doc_md_map = {task.task_id: task.doc_md for task in dag.tasks}
-            task_instances = session.query(TaskInstance).filter(
-                TaskInstance.dag_id == dag_run.dag_id,
-                TaskInstance.run_id == dag_run.run_id).all()
+            task_instances = (
+                session.query(TaskInstance)
+                .filter(
+                    TaskInstance.dag_id == dag_run.dag_id,
+                    TaskInstance.run_id == dag_run.run_id,
+                )
+                .all()
+            )
             for task_instance in task_instances:
                 new_content = doc_md_map.get(task_instance.task_id, "")
                 if not new_content:
                     continue
                 existing_note_obj = existing_notes_map.get(
-                    (task_instance.task_id, task_instance.map_index))
+                    (task_instance.task_id, task_instance.map_index)
+                )
                 if existing_note_obj:
                     # Only update if changed to reduce DB noise
                     if existing_note_obj.content != new_content:
@@ -160,7 +173,8 @@ def generate(
 
     schedule_trigger = next(
         (t for t in pipeline.triggers if isinstance(t, ScheduleTriggerModel)),
-        None)
+        None,
+    )
 
     dag_kwargs = {
         "dag_id": pipeline.metadata.pipelineId,
@@ -186,10 +200,12 @@ def generate(
     dag_kwargs["doc_md"] = dag_notes
 
     dag = DAG(**dag_kwargs)
-    _ = PythonOperator(task_id="init_orchestration_pipeline_context",
-                       python_callable=init_orchestration_pipeline_context,
-                       op_args=[dag_notes],
-                       dag=dag)
+    _ = PythonOperator(
+        task_id="init_orchestration_pipeline_context",
+        python_callable=init_orchestration_pipeline_context,
+        op_args=[dag_notes],
+        dag=dag,
+    )
     tasks = {}
     # 2. Create tasks in a task group and explicitly associate them with the dag
     for action in pipeline.actions:
@@ -207,7 +223,8 @@ def generate(
                 if dep_name not in tasks:
                     raise ValueError(
                         f"Task {dep_name} being upstream dependency for "
-                        f"{action.name} does not exist.")
+                        f"{action.name} does not exist."
+                    )
                 upstream_task = tasks[dep_name]
                 # Relationships are safely set on the objects directly
                 current_task.set_upstream(upstream_task)
@@ -227,19 +244,28 @@ def get_actively_running_versions(pipeline_id, bundle_id) -> list[str]:
 
     active_states = [State.RUNNING, State.QUEUED]
     with create_session() as session:
-        runs = (session.query(DagRun.dag_id).filter(
-            DagRun.state.in_(active_states),
-            DagRun.dag_id.like(f"{bundle_id}__v__%__{pipeline_id}"),
-        ).all())
-    version_ids = list({
-        x[0].removeprefix(f"{bundle_id}__v__").removesuffix(
-            f"__{pipeline_id}") for x in runs
-    })
+        runs = (
+            session.query(DagRun.dag_id)
+            .filter(
+                DagRun.state.in_(active_states),
+                DagRun.dag_id.like(f"{bundle_id}__v__%__{pipeline_id}"),
+            )
+            .all()
+        )
+    version_ids = list(
+        {
+            x[0]
+            .removeprefix(f"{bundle_id}__v__")
+            .removesuffix(f"__{pipeline_id}")
+            for x in runs
+        }
+    )
     return version_ids
 
 
-def get_previous_default_versions(pipeline_id: str,
-                                  bundle_id: str) -> list[str]:
+def get_previous_default_versions(
+    pipeline_id: str, bundle_id: str
+) -> list[str]:
     """Retrieves a list of previous default versions for a given pipeline.
 
     Queries the Airflow database for DAGs tagged as current for the specific
@@ -248,17 +274,22 @@ def get_previous_default_versions(pipeline_id: str,
     from airflow.models.dag import DagTag
     from airflow.utils.session import create_session
     from sqlalchemy import func
+
     with create_session() as session:
         # 1. Subquery to find dag_ids that have ALL THREE required tags.
         # This uses a "Tag Intersection" pattern (GROUP BY + HAVING COUNT)
         # which avoids multiple joins and table scans.
         subquery = (
             session.query(DagTag.dag_id)
-            .filter(DagTag.name.in_([
-                "op:is_current",
-                f"op:bundle:{bundle_id}",
-                f"op:pipeline:{pipeline_id}"
-            ]))
+            .filter(
+                DagTag.name.in_(
+                    [
+                        "op:is_current",
+                        f"op:bundle:{bundle_id}",
+                        f"op:pipeline:{pipeline_id}",
+                    ]
+                )
+            )
             .group_by(DagTag.dag_id)
             .having(func.count(DagTag.name) == 3)
             .subquery()
@@ -270,8 +301,7 @@ def get_previous_default_versions(pipeline_id: str,
         tags = (
             session.query(DagTag.dag_id, DagTag.name)
             .filter(
-                DagTag.dag_id.in_(subquery),
-                DagTag.name.like("op:version:%")
+                DagTag.dag_id.in_(subquery), DagTag.name.like("op:version:%")
             )
             .all()
         )

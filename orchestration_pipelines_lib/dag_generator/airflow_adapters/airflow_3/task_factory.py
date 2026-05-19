@@ -35,14 +35,17 @@ if TYPE_CHECKING:
     )
 
 
-def create_python_script_task(action: Dict[str, Any], _: Dict[str, Any],
-                              dag) -> PythonOperator:
+def create_python_script_task(
+    action: Dict[str, Any], _: Dict[str, Any], dag
+) -> PythonOperator:
     """Converts an action into a PythonOperator."""
     from airflow.providers.standard.operators.python import PythonOperator
+
     try:
         callable_path = action.filename
         entrypoint = action.config.pythonCallable
         user_kwargs = action.config.opKwargs or {}
+
         def runtime_wrapper(**kwargs):
             python_callable = utils.import_callable(callable_path, entrypoint)
             filtered_kwargs = {
@@ -54,19 +57,25 @@ def create_python_script_task(action: Dict[str, Any], _: Dict[str, Any],
             task_id=action.name,
             python_callable=runtime_wrapper,
             op_kwargs=action.config.opKwargs or {},
-            execution_timeout=duration_to_timedelta(action.executionTimeout)
-            if action.executionTimeout else None,
+            execution_timeout=(
+                duration_to_timedelta(action.executionTimeout)
+                if action.executionTimeout
+                else None
+            ),
             doc_md=json.dumps({"op_action_name": action.name}),
             dag=dag,
         )
     except Exception as e:
-        print(f"Error creating task for action '{action.name}'"
-              f" from '{action.config.pythonCallable}': {e}")
+        print(
+            f"Error creating task for action '{action.name}'"
+            f" from '{action.config.pythonCallable}': {e}"
+        )
         raise
 
 
-def create_python_virtualenv_task(action: Dict[str, Any], _: Dict[str, Any],
-                                  dag) -> PythonVirtualenvOperator:
+def create_python_virtualenv_task(
+    action: Dict[str, Any], _: Dict[str, Any], dag
+) -> PythonVirtualenvOperator:
     """Converts an action into a PythonVirtualenvOperator."""
     from airflow.providers.standard.operators.python import (
         PythonVirtualenvOperator,
@@ -79,11 +88,14 @@ def create_python_virtualenv_task(action: Dict[str, Any], _: Dict[str, Any],
         if not callable(python_callable):
             raise ValueError(
                 f"Action {action.name}: filename {callable_path} with "
-                f"callable {entrypoint} did not resolve to a callable object.")
+                f"callable {entrypoint} did not resolve to a callable object."
+            )
 
-        requirements = (action.config.requirementsPath
-                        if action.config.requirementsPath else
-                        action.config.requirements)
+        requirements = (
+            action.config.requirementsPath
+            if action.config.requirementsPath
+            else action.config.requirements
+        )
 
         return PythonVirtualenvOperator(
             task_id=action.name,
@@ -91,39 +103,47 @@ def create_python_virtualenv_task(action: Dict[str, Any], _: Dict[str, Any],
             op_kwargs=action.config.opKwargs or {},
             requirements=requirements,
             system_site_packages=action.config.systemSitePackages,
-            execution_timeout=duration_to_timedelta(action.executionTimeout)
-            if action.executionTimeout else None,
+            execution_timeout=(
+                duration_to_timedelta(action.executionTimeout)
+                if action.executionTimeout
+                else None
+            ),
             doc_md=json.dumps({"op_action_name": action.name}),
             dag=dag,
         )
     except Exception as e:
-        print(f"Error creating task for action '{action.name}' "
-              f"from '{action.config.pythonCallable}': {e}")
+        print(
+            f"Error creating task for action '{action.name}' "
+            f"from '{action.config.pythonCallable}': {e}"
+        )
         raise
 
 
-def create_bq_operation_task(action: Dict[str, Any], pipeline: Dict[str, Any],
-                             dag):
+def create_bq_operation_task(
+    action: Dict[str, Any], pipeline: Dict[str, Any], dag
+):
     """Converts action to SQL job running on BigQuery or Dataproc."""
     return task_utils.create_bq_operation_task(action, pipeline, dag=dag)
 
 
 def create_schedule_trigger_task(dag_kwargs, schedule_trigger):
     """Converts trigger config into params for Airflow pipeline."""
-    return task_utils.create_schedule_trigger_task(dag_kwargs,
-                                                   schedule_trigger)
+    return task_utils.create_schedule_trigger_task(dag_kwargs, schedule_trigger)
 
 
-def create_dataproc_operator_task(action: Dict[str, Any],
-                                  pipeline: Dict[str, Any], dag):
+def create_dataproc_operator_task(
+    action: Dict[str, Any], pipeline: Dict[str, Any], dag
+):
     """Converts an action into a Dataproc Operator."""
     return task_utils.create_dataproc_operator_task(action, pipeline, dag=dag)
 
 
-def create_dbt_task(action: Dict[str, Any], _: Dict[str, Any],
-                    dag) -> PythonOperator:
+def create_dbt_task(
+    action: Dict[str, Any], _: Dict[str, Any], dag
+) -> PythonOperator:
     """Converts an action into a PythonOperator for dbt."""
     from airflow.providers.standard.operators.python import PythonOperator
+
     try:
         op_kwargs = {
             "project_dir": action.source.path,
@@ -136,35 +156,39 @@ def create_dbt_task(action: Dict[str, Any], _: Dict[str, Any],
             task_id=action.name,
             python_callable=invoke_dbt_run,
             op_kwargs=op_kwargs,
-            execution_timeout=duration_to_timedelta(action.executionTimeout)
-            if action.executionTimeout else None,
+            execution_timeout=(
+                duration_to_timedelta(action.executionTimeout)
+                if action.executionTimeout
+                else None
+            ),
             doc_md=json.dumps({"op_action_name": action.name}),
-            dag=dag)
+            dag=dag,
+        )
     except Exception as e:
         print(f"Error creating task for action '{action.name}': {e}")
         raise
 
 
-def create_dataform_task(action: Dict[str, Any], pipeline: Dict[str, Any],
-                         dag):
+def create_dataform_task(action: Dict[str, Any], pipeline: Dict[str, Any], dag):
     """Converts an action into a Dataform operator.
 
     Depending on the execution mode, it either runs a local
     KubernetesPodOperator or invokes the Dataform service operator.
     """
     from airflow.sdk import Variable
+
     if action.executionMode == "local":
         # Allow overriding with an Airflow variable for flexibility
-        gcs_bucket_path = Variable.get("dataform_gcs_path",
-                                       action.dataform_project_path)
-        return task_utils.create_local_dataform_task(action,
-                                                     pipeline,
-                                                     gcs_bucket_path,
-                                                     dag=dag)
+        gcs_bucket_path = Variable.get(
+            "dataform_gcs_path", action.dataform_project_path
+        )
+        return task_utils.create_local_dataform_task(
+            action, pipeline, gcs_bucket_path, dag=dag
+        )
     else:
-        return task_utils.create_service_dataform_task(action,
-                                                       pipeline,
-                                                       dag=dag)
+        return task_utils.create_service_dataform_task(
+            action, pipeline, dag=dag
+        )
 
 
 def create_bq_dts_task(action: Dict[str, Any], pipeline: Dict[str, Any], dag):
