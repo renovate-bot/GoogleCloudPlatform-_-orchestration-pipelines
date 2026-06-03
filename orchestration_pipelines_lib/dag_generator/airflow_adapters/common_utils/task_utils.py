@@ -269,6 +269,7 @@ def create_dataproc_create_batch_operator_task(
                 else None
             ),
             impersonation_chain=action.impersonationChain,
+            trigger_rule=action.triggerRule,
             doc_md=json.dumps({"op_action_name": action.name}),
             dag=dag,
             **extra_kwargs,
@@ -338,6 +339,7 @@ def create_bq_operation_task(
             ),
             gcp_conn_id="google_cloud_default",
             impersonation_chain=action.impersonationChain,
+            trigger_rule=action.triggerRule,
             doc_md=json.dumps({"op_action_name": action.name}),
             dag=dag,
         )
@@ -378,6 +380,7 @@ def dataproc_ephemeral_task(action: Dict[str, Any], dag) -> TaskGroup:
                 region=action.config.region,
                 cluster_name=action.config.cluster_name,
                 impersonation_chain=action.impersonationChain,
+                trigger_rule=action.triggerRule,
                 doc_md=json.dumps({"op_action_name": action.name}),
                 labels=action.labels,
                 dag=dag,
@@ -514,6 +517,7 @@ def dataproc_existing_cluster(
             region=action.region,
             project_id=pipeline.defaults.cloudDefault.project,
             impersonation_chain=action.impersonationChain,
+            trigger_rule=action.triggerRule,
             doc_md=json.dumps({"op_action_name": action.name}),
             dag=dag,
             **extra_kwargs,
@@ -628,6 +632,7 @@ def create_service_dataform_task(
         ),
         repository_id=action.dataformServiceConfig.repository_id,
         workflow_invocation=action.dataformServiceConfig.workflow_invocation,
+        trigger_rule=action.triggerRule,
         doc_md=json.dumps({"op_action_name": action.name}),
         dag=dag,
     )
@@ -683,6 +688,7 @@ def create_local_dataform_task(
             if action.executionTimeout
             else None
         ),
+        trigger_rule=action.triggerRule,
         doc_md=json.dumps({"op_action_name": action.name}),
         dag=dag,
     )
@@ -750,6 +756,7 @@ def create_bq_dts_task(
                     if action.executionTimeout
                     else None
                 ),
+                trigger_rule=action.triggerRule,
                 doc_md=json.dumps({"op_action_name": action.name}),
                 dag=dag,
             )

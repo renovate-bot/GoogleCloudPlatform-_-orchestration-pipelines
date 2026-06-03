@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING, Dict, Optional
 
 import yaml
@@ -54,11 +55,47 @@ if TYPE_CHECKING:
     from google.protobuf.message import Message
 
 
+class AirflowTriggerRule(str, Enum):
+    """Trigger rules supported by Airflow."""
+
+    ALL_SUCCESS = "all_success"
+    ALL_FAILED = "all_failed"
+    ALL_DONE = "all_done"
+    ONE_FAILED = "one_failed"
+    ONE_SUCCESS = "one_success"
+    ALWAYS = "always"
+
+
+_TRIGGER_RULE_MAPPING = {
+    v1_pipeline_protos.TriggerRule.all_success: AirflowTriggerRule.ALL_SUCCESS,
+    v1_pipeline_protos.TriggerRule.all_failed: AirflowTriggerRule.ALL_FAILED,
+    v1_pipeline_protos.TriggerRule.all_done: AirflowTriggerRule.ALL_DONE,
+    v1_pipeline_protos.TriggerRule.one_failed: AirflowTriggerRule.ONE_FAILED,
+    v1_pipeline_protos.TriggerRule.one_success: AirflowTriggerRule.ONE_SUCCESS,
+    v1_pipeline_protos.TriggerRule.always: AirflowTriggerRule.ALWAYS,
+}
+
+
 class ConverterV1ToInternal:
     """Converts v1 pipeline models (protobufs) to internal models."""
 
     def __init__(self, file_manager: FileManager):
         self.file_manager = file_manager
+
+    def _convert_trigger_rule(self, trigger_rule_val: int) -> str:
+        if (
+            trigger_rule_val
+            == v1_pipeline_protos.TriggerRule.trigger_rule_undefined
+        ):
+            return AirflowTriggerRule.ALL_SUCCESS.value
+
+        mapped_val = _TRIGGER_RULE_MAPPING.get(trigger_rule_val)
+        if not mapped_val:
+            rule_name = v1_pipeline_protos.TriggerRule.Name(trigger_rule_val)
+            raise ValueError(
+                f"Unsupported or unmapped trigger rule: {rule_name}"
+            )
+        return mapped_val.value
 
     def _normalize_environment_config(
         self, environment_config_msg: Message
@@ -385,6 +422,7 @@ class ConverterV1ToInternal:
                 filename=self.file_manager.resolve_path(action.main_file_path),
                 executionTimeout=action.execution_timeout or None,
                 dependsOn=list(action.depends_on),
+                triggerRule=self._convert_trigger_rule(action.trigger_rule),
                 config=internal_actions.PythonVirtualenvConfigurationModel(
                     pythonCallable=action.python_callable,
                     opKwargs=op_kwargs,
@@ -400,6 +438,7 @@ class ConverterV1ToInternal:
                 filename=self.file_manager.resolve_path(action.main_file_path),
                 executionTimeout=action.execution_timeout or None,
                 dependsOn=list(action.depends_on),
+                triggerRule=self._convert_trigger_rule(action.trigger_rule),
                 config=internal_actions.PythonScriptConfigurationModel(
                     pythonCallable=action.python_callable,
                     opKwargs=op_kwargs,
@@ -482,6 +521,7 @@ class ConverterV1ToInternal:
             query=None,
             executionTimeout=action.execution_timeout or None,
             dependsOn=list(action.depends_on),
+            triggerRule=self._convert_trigger_rule(action.trigger_rule),
             region=region,
             labels=labels,
             impersonationChain=impersonation_chain,
@@ -521,6 +561,7 @@ class ConverterV1ToInternal:
                 labels=labels,
                 executionTimeout=action.execution_timeout or None,
                 dependsOn=list(action.depends_on),
+                triggerRule=self._convert_trigger_rule(action.trigger_rule),
                 impersonationChain=list(bq_engine.impersonation_chain),
                 config=internal_actions.BqOperationConfigurationModel(
                     location=bq_engine.location or defaults.location,
@@ -551,6 +592,7 @@ class ConverterV1ToInternal:
                 labels=labels,
                 executionTimeout=action.execution_timeout or None,
                 dependsOn=list(action.depends_on),
+                triggerRule=self._convert_trigger_rule(action.trigger_rule),
                 region=region,
                 impersonationChain=impersonation_chain,
                 engine=internal_engine,
@@ -606,6 +648,7 @@ class ConverterV1ToInternal:
                 labels=labels,
                 executionTimeout=action.execution_timeout or None,
                 dependsOn=list(action.depends_on),
+                triggerRule=self._convert_trigger_rule(action.trigger_rule),
                 region=region,
                 impersonationChain=impersonation_chain,
                 engine=internal_engine,
@@ -630,6 +673,7 @@ class ConverterV1ToInternal:
                     name=action.name,
                     executionTimeout=action.execution_timeout or None,
                     dependsOn=list(action.depends_on),
+                    triggerRule=self._convert_trigger_rule(action.trigger_rule),
                     type="dbt_pipeline",
                     engine="dbt",
                     executionMode="local",
@@ -649,6 +693,7 @@ class ConverterV1ToInternal:
                     name=action.name,
                     executionTimeout=action.execution_timeout or None,
                     dependsOn=list(action.depends_on),
+                    triggerRule=self._convert_trigger_rule(action.trigger_rule),
                     type="dataform_pipeline",
                     executionMode="local",
                     dataform_project_path=self.file_manager.get_blob_reference(
@@ -667,6 +712,7 @@ class ConverterV1ToInternal:
                     name=action.name,
                     executionTimeout=action.execution_timeout or None,
                     dependsOn=list(action.depends_on),
+                    triggerRule=self._convert_trigger_rule(action.trigger_rule),
                     type="dataform_pipeline",
                     executionMode="service",
                     dataformServiceConfig=internal_actions.DataformServiceModel(
@@ -715,6 +761,7 @@ class ConverterV1ToInternal:
                 type="data_ingestion",
                 executionTimeout=action.execution_timeout or None,
                 dependsOn=list(action.depends_on),
+                triggerRule=self._convert_trigger_rule(action.trigger_rule),
                 labels=labels,
                 config=spec_model,
             )
@@ -732,6 +779,7 @@ class ConverterV1ToInternal:
             type="orchestration_pipeline",
             executionTimeout=action.execution_timeout or None,
             dependsOn=list(action.depends_on),
+            triggerRule=self._convert_trigger_rule(action.trigger_rule),
             pipeline_id=action.pipeline_id,
             bundle_id=action.bundle_id,
             wait_for_completion=action.wait_for_completion,

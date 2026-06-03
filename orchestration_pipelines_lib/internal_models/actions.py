@@ -26,6 +26,7 @@ class ActionBaseModel:
     name: str
     dependsOn: Optional[List[str]]
     executionTimeout: Optional[str]
+    triggerRule: Optional[str]
 
 
 @dataclass

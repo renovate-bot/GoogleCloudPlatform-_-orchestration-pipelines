@@ -179,6 +179,7 @@ class TaskUtilsTest(unittest.TestCase):
         action.executionTimeout = None
         action.impersonationChain = None
         action.labels = {"label1": "value1"}
+        action.triggerRule = "all_success"
 
         action.config.resourceProfile.runtimeConfig = {}
         action.config.resourceProfile.environmentConfig = {}
@@ -297,6 +298,7 @@ class TaskUtilsTest(unittest.TestCase):
         action.config.runtimeParams = {"requested_run_time": {"seconds": 999}}
         action.config.impersonationChain = ["dts-sa@dts-proj.iam.gserviceaccount.com"]
         action.executionTimeout = "1000s"
+        action.triggerRule = "all_success"
 
         pipeline = MagicMock()
         pipeline.defaults.cloudDefault.project = "default-proj"
@@ -352,6 +354,7 @@ class TaskUtilsTest(unittest.TestCase):
         action.config.runtimeParams = None
         action.config.impersonationChain = None
         action.executionTimeout = None
+        action.triggerRule = "all_success"
 
         pipeline = MagicMock()
         pipeline.defaults.cloudDefault.project = "default-proj"
@@ -394,6 +397,7 @@ class TaskUtilsTest(unittest.TestCase):
         action.name = "my_dataform_action"
         action.labels = {"env": "prod", "team": "data"}
         action.executionTimeout = "600s"
+        action.triggerRule = "all_success"
 
         pipeline = MagicMock()
         dag = DAG(
@@ -431,6 +435,7 @@ class TaskUtilsTest(unittest.TestCase):
         action.name = "my_dataform_action"
         action.labels = None
         action.executionTimeout = None
+        action.triggerRule = "all_success"
 
         pipeline = MagicMock()
         dag = DAG(

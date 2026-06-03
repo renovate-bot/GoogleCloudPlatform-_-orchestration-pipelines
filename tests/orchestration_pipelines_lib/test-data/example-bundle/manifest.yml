@@ -38,6 +38,7 @@ versionsHistory:
       - dataproc-ephemeral-inline-pyspark
       - dataproc-ephemeral-relative-resource-profile-pyspark
       - fail-step3-generation-error # needed for unit tests
+      - trigger-rule-pipeline
     metadata:
       origination: GIT_CI_CD
       deploymentDetails:

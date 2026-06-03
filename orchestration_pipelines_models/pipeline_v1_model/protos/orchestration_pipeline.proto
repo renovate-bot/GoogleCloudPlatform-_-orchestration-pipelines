@@ -53,6 +53,16 @@ enum PipelineRunner {
   airflow = 1;
 }
 
+enum TriggerRule {
+  trigger_rule_undefined = 0;
+  all_success = 1;
+  all_failed = 2;
+  all_done = 3;
+  one_failed = 4;
+  one_success = 5;
+  always = 6;
+}
+
 message Defaults {
   string project_id = 1 [(pipeline_models.validation.is_required) = true];
   string location = 2 [(pipeline_models.validation.is_required) = true];
@@ -209,6 +219,7 @@ message PythonAction {
   google.protobuf.Struct op_kwargs = 6;
   PythonEnvironment environment = 7;
   PythonEngine engine = 8 [(pipeline_models.validation.is_required) = true];
+  TriggerRule trigger_rule = 9; // Default: all_success.
 }
 
 message PythonEnvironment {
@@ -251,6 +262,7 @@ message PysparkAction {
   string staging_bucket = 7;
   repeated string py_files = 8;
   PysparkEnvironment environment = 9;
+  TriggerRule trigger_rule = 10; // Default: all_success.
 }
 
 message PysparkEngine {
@@ -286,6 +298,7 @@ message NotebookAction {
   repeated string archive_uris = 6;
   string staging_bucket = 7;
   NotebookEnvironment environment = 8;
+  TriggerRule trigger_rule = 9; // Default: all_success.
 }
 
 message NotebookEngine {
@@ -318,6 +331,7 @@ message SqlAction {
   string execution_timeout = 3 [(pipeline_models.validation.is_iso8601_duration) = true];
   SqlEngine engine = 4 [(pipeline_models.validation.is_required) = true];
   Query query = 5 [(pipeline_models.validation.is_required) = true];
+  TriggerRule trigger_rule = 6; // Default: all_success.
 }
 
 message Query {
@@ -349,6 +363,7 @@ message PipelineAction {
   repeated string depends_on = 2;
   string execution_timeout = 3 [(pipeline_models.validation.is_iso8601_duration) = true];
   PipelineFramework framework = 4 [(pipeline_models.validation.is_required) = true];
+  TriggerRule trigger_rule = 5; // Default: all_success.
 }
 
 message PipelineFramework {
@@ -414,6 +429,7 @@ message DataIngestionAction {
   oneof config {
     BigQueryDtsSpec bigquery_dts = 4;
   }
+  TriggerRule trigger_rule = 5; // Default: all_success.
 }
 
 message BigQueryDtsSpec {
@@ -448,4 +464,5 @@ message OrchestrationPipelineAction {
   ];
   string bundle_id = 5; // Default: current bundle.
   bool wait_for_completion = 6; // Default: false.
+  TriggerRule trigger_rule = 7; // Default: all_success.
 }

@@ -124,6 +124,7 @@ def create_python_script_task(
                 if action.executionTimeout
                 else None
             ),
+            trigger_rule=action.triggerRule,
             doc_md=json.dumps({"op_action_name": action.name}),
             dag=dag,
         )
@@ -170,6 +171,7 @@ def create_python_virtualenv_task(
                 if action.executionTimeout
                 else None
             ),
+            trigger_rule=action.triggerRule,
             doc_md=json.dumps({"op_action_name": action.name}),
             dag=dag,
         )
@@ -223,6 +225,7 @@ def create_dbt_task(
                 if action.executionTimeout
                 else None
             ),
+            trigger_rule=action.triggerRule,
             doc_md=json.dumps({"op_action_name": action.name}),
             dag=dag,
         )
@@ -284,6 +287,7 @@ def create_orchestration_pipeline_trigger_task(
                 if action.executionTimeout
                 else None
             ),
+            trigger_rule=action.triggerRule,
             doc_md=json.dumps({"op_action_name": action.name}),
             dag=dag,
         )

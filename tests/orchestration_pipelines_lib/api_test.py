@@ -553,6 +553,36 @@ class TestApi(unittest.TestCase):
                 mock_get_versions=mock_get_versions,
                 is_current=False)
 
+    @patch("airflow.utils.db.create_session")
+    @patch(
+        "orchestration_pipelines_lib.utils.versions_utils.get_versions_to_parse"
+    )
+    def test_generate_dag_with_trigger_rule(self, mock_get_versions, mock_session):
+        """Tests that custom trigger rule is correctly set on generated tasks."""
+        mock_get_versions.return_value = [_TEST_DEFAULT_VERSION_ID]
+        pipeline_id = "trigger-rule-pipeline"
+        expected_dag_id = _get_expected_dag_id(pipeline_id)
+
+        if hasattr(_API_MODULE, expected_dag_id):
+            delattr(_API_MODULE, expected_dag_id)
+
+        api.generate_dags(_get_data_root_path(), _TEST_BUNDLE_ID, pipeline_id,
+                          _API_MODULE.__dict__)
+
+        self.assertTrue(hasattr(_API_MODULE, expected_dag_id))
+        dag = getattr(_API_MODULE, expected_dag_id)
+        self.assertIsInstance(dag, DAG)
+
+        # Assert that "normal_python_code" task has trigger_rule set to "all_failed"
+        tasks_map = {t.task_id: t for t in dag.tasks}
+        self.assertIn("normal_python_code", tasks_map)
+        self.assertEqual(tasks_map["normal_python_code"].trigger_rule, "all_failed")
+
+        # Assert that "failed_python_code" task has the default trigger_rule "all_success"
+        self.assertIn("failed_python_code", tasks_map)
+        self.assertEqual(tasks_map["failed_python_code"].trigger_rule, "all_success")
+
+
 
 def _get_data_root_path():
     return os.path.join(_PROJECT_ROOT,

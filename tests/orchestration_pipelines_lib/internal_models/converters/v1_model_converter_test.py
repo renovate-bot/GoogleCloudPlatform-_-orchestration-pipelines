@@ -15,7 +15,7 @@
 """Unit tests for the v1_model_converter module."""
 
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from google.protobuf import struct_pb2
 
@@ -54,6 +54,41 @@ class TestConverterV1ToInternal(unittest.TestCase):
             location="default-location",
         )
         self.labels = {"op:orchestration_pipeline": "true"}
+
+    @patch("orchestration_pipelines_lib.internal_models.converters.v1_model_converter.v1_pipeline_protos.TriggerRule")
+    def test_convert_trigger_rule_unmapped_raises_value_error(
+        self, mock_trigger_rule
+    ):
+        """Tests that an unmapped trigger rule raises a ValueError."""
+        mock_trigger_rule.Name.return_value = "unsupported_rule"
+        with self.assertRaisesRegex(
+            ValueError, "Unsupported or unmapped trigger rule: unsupported_rule"
+        ):
+            self.converter._convert_trigger_rule(999)
+
+    def test_convert_trigger_rule_mapped_success(self):
+        """Tests that mapped trigger rules convert correctly."""
+        self.assertEqual(
+            self.converter._convert_trigger_rule(
+                v1_protos.TriggerRule.all_success
+            ),
+            "all_success",
+        )
+        self.assertEqual(
+            self.converter._convert_trigger_rule(
+                v1_protos.TriggerRule.always
+            ),
+            "always",
+        )
+
+    def test_convert_trigger_rule_undefined_defaults_to_all_success(self):
+        """Tests that undefined trigger rule defaults to all_success."""
+        self.assertEqual(
+            self.converter._convert_trigger_rule(
+                v1_protos.TriggerRule.trigger_rule_undefined
+            ),
+            "all_success",
+        )
 
     def test_convert_to_internal_model_full(self):
         """Tests conversion of a full v1 pipeline model."""
@@ -161,6 +196,7 @@ class TestConverterV1ToInternal(unittest.TestCase):
             depends_on=["dep1"],
             wait_for_completion=True,
             bundle_id="bundle-id",
+            trigger_rule=v1_protos.TriggerRule.all_done,
         )
 
         internal_action = self.converter._convert_orchestration_pipeline_action(
@@ -177,6 +213,7 @@ class TestConverterV1ToInternal(unittest.TestCase):
         self.assertEqual(internal_action.bundle_id, "bundle-id")
         self.assertEqual(internal_action.executionTimeout, "120s")
         self.assertEqual(internal_action.dependsOn, ["dep1"])
+        self.assertEqual(internal_action.triggerRule, "all_done")
 
     def test_convert_python_action_script(self):
         """Tests conversion of a simple Python script action."""
