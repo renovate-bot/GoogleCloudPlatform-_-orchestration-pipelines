@@ -306,9 +306,23 @@ class PipelineValidator:
         """Validates that a string field is a valid cron expression."""
         if field.cpp_type == FieldDescriptor.CPPTYPE_STRING and value:
             try:
+                cls._check_quote_issues(value)
                 time_utils.check_cron_expression(value)
             except ValueError as e:
                 raise ValueError(f"Error for field '{path}': {e}") from e
+
+    @classmethod
+    def _check_quote_issues(cls, value: str):
+        """Detects if a value contains quotes, which are invalid for these fields."""
+        if '"' in value or "'" in value:
+            # Check if it looks like a quoting error (starts or ends with a quote)
+            if value.startswith(('"', "'")) or value.endswith(('"', "'")):
+                if len(value) < 2 or value[0] != value[-1]:
+                    raise ValueError("mismatched quote boundaries.")
+                raise ValueError("value should not be wrapped in literal quotes.")
+
+            # General error for quotes anywhere else
+            raise ValueError("field contains invalid quote characters.")
 
     @classmethod
     def _validate_is_iso8601_timestamp(
@@ -317,14 +331,12 @@ class PipelineValidator:
         """Validates that a string field is a valid ISO 8601 timestamp."""
         if field.cpp_type == FieldDescriptor.CPPTYPE_STRING and value:
             try:
+                cls._check_quote_issues(value)
                 # Replacing 'Z' with '+00:00' for broader Python version
                 # compatibility with fromisoformat().
                 datetime.fromisoformat(value.replace("Z", "+00:00"))
             except ValueError as e:
-                raise ValueError(
-                    f"Error for field '{path}': value '{value}' is not a "
-                    "valid ISO 8601 timestamp."
-                ) from e
+                raise ValueError(f"Error for field '{path}': {e}") from e
 
     @classmethod
     def _validate_is_iso8601_duration(
@@ -333,6 +345,7 @@ class PipelineValidator:
         """Validates that a string field is a valid duration string."""
         if field.cpp_type == FieldDescriptor.CPPTYPE_STRING and value:
             try:
+                cls._check_quote_issues(value)
                 time_utils.check_duration(value)
             except (ValueError, TypeError) as e:
                 raise ValueError(f"Error for field '{path}': {e}") from e
@@ -344,6 +357,7 @@ class PipelineValidator:
         """Validates that a string field is a valid IANA timezone."""
         if field.cpp_type == FieldDescriptor.CPPTYPE_STRING and value:
             try:
+                cls._check_quote_issues(value)
                 time_utils.check_timezone(value)
             except ValueError as e:
                 raise ValueError(f"Error for field '{path}': {e}") from e

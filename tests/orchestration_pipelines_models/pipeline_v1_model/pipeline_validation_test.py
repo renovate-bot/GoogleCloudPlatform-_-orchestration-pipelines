@@ -157,9 +157,77 @@ class TestPipelineValidator(unittest.TestCase):
         with self.assertRaisesRegex(
                 ValueError,
             (r"Error for field 'triggers\[0\].schedule.start_time': "
-             r".*is not a valid ISO 8601 timestamp"),
+             r"Invalid isoformat string: '2025/01/01'"),
         ):
             PipelineValidator.validate(self.pipeline)
+
+    def test_is_iso8601_timestamp_start_time_trailing_quotes(self):
+        """Tests descriptive error when start_time has mismatched trailing quotes."""
+        trigger = Trigger(schedule=ScheduleTrigger(
+            interval="* * * * *",
+            start_time='2025-10-01T00:00:00"\'',  # trailing quotes
+        ))
+        self.pipeline.triggers.extend([trigger])
+        with self.assertRaisesRegex(
+                ValueError,
+            (r"Error for field 'triggers\[0\].schedule.start_time': "
+             r"mismatched quote boundaries\."),
+        ):
+            PipelineValidator.validate(self.pipeline)
+
+    def test_is_iso8601_timestamp_end_time_leading_quote(self):
+        """Tests descriptive error when end_time has a mismatched leading quote."""
+        trigger = Trigger(schedule=ScheduleTrigger(
+            interval="* * * * *",
+            start_time="2025-09-01T00:00:00",
+            end_time='"2026-10-01T00:00:00',  # leading quote
+        ))
+        self.pipeline.triggers.extend([trigger])
+        with self.assertRaisesRegex(
+                ValueError,
+            (r"Error for field 'triggers\[0\].schedule.end_time': "
+             r"mismatched quote boundaries\."),
+        ):
+            PipelineValidator.validate(self.pipeline)
+
+    def test_is_cron_expression_trailing_quote(self):
+        """Tests descriptive error when cron interval has a mismatched trailing quote."""
+        trigger = Trigger(schedule=ScheduleTrigger(
+            interval='* * * * *"', start_time="2025-01-01T00:00:00Z"
+        ))
+        self.pipeline.triggers.extend([trigger])
+        with self.assertRaisesRegex(
+                ValueError,
+            (r"Error for field 'triggers\[0\].schedule.interval': "
+             r"mismatched quote boundaries\."),
+        ):
+            PipelineValidator.validate(self.pipeline)
+
+    def test_iso8601_duration_leading_quote(self):
+        """Tests descriptive error when duration has a mismatched leading quote."""
+        self.pipeline.actions[0].python.execution_timeout = '"1h'
+        with self.assertRaisesRegex(
+                ValueError,
+            (r"Error for field 'actions\[0\].python.execution_timeout': "
+             r"mismatched quote boundaries\."),
+        ):
+            PipelineValidator.validate(self.pipeline)
+
+    def test_iana_timezone_leading_quote(self):
+        """Tests descriptive error when timezone has a mismatched leading quote."""
+        trigger = Trigger(schedule=ScheduleTrigger(
+            interval="* * * * *",
+            start_time="2025-01-01T00:00:00Z",
+            timezone='"UTC',
+        ))
+        self.pipeline.triggers.extend([trigger])
+        with self.assertRaisesRegex(
+                ValueError,
+            (r"Error for field 'triggers\[0\].schedule.timezone': "
+             r"mismatched quote boundaries\."),
+        ):
+            PipelineValidator.validate(self.pipeline)
+
 
     def test_duration_fails(self):
         """Tests failure for an invalid duration string."""
