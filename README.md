@@ -2,10 +2,10 @@
 
 [![PyPI version](https://badge.fury.io/py/orchestration-pipelines.svg)](https://badge.fury.io/py/orchestration-pipelines)
 [![Python Versions](https://img.shields.io/pypi/pyversions/orchestration-pipelines.svg)](https://pypi.org/project/orchestration-pipelines/)
-[![Support Status](https://img.shields.io/badge/support-preview-orange.svg)](https://github.com/google/composer-declarative-dags)
+[![Support Status](https://img.shields.io/badge/support-preview-orange.svg)](https://github.com/GoogleCloudPlatform/orchestration-pipelines)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-A library for defining and generating Apache Airflow DAGs declaratively using YAML. Currently focused on orchestration of GCP resources (Dataproc, BigQuery, Dataform) and DBT.
+A library for defining and generating Apache Airflow DAGs declaratively using YAML. Currently focused on orchestration of GCP resources (Dataproc, BigQuery, Dataform) and DBT...
 
 > [!NOTE]
 > This library is currently in **Preview**.
@@ -13,6 +13,9 @@ A library for defining and generating Apache Airflow DAGs declaratively using YA
 ## Overview
 
 `orchestration-pipelines` allows you to define complex data workflows in simple, human-readable YAML files. It abstracts away the boilerplate of writing Airflow DAGs in Python, making it easier for non-Python experts to create and manage pipelines.
+
+- **Documentation**: [docs/doc.md](docs/doc.md)
+- **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 
 ## Supported Python Versions
 
@@ -95,6 +98,10 @@ Airflow will parse this Python file and automatically generate the DAG based on 
 You can manage multiple versions of your pipelines using a `manifest.yaml` file. This allows you to specify which version of a pipeline should be active.
 
 See the `examples/` directory for a sample `manifest.yaml` and how to use it.
+
+## Contributing
+
+Contributions are welcome! Please see [contributing.md](contributing.md) for guidelines.
 
 ## License
 
