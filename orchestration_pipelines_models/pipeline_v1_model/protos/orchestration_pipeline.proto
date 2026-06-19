@@ -263,6 +263,7 @@ message PysparkAction {
   repeated string py_files = 8;
   PysparkEnvironment environment = 9;
   TriggerRule trigger_rule = 10; // Default: all_success.
+  map<string, string> params = 11;
 }
 
 message PysparkEngine {
@@ -303,6 +304,7 @@ message NotebookAction {
   string staging_bucket = 7;
   NotebookEnvironment environment = 8;
   TriggerRule trigger_rule = 9; // Default: all_success.
+  map<string, string> params = 10;
 }
 
 message NotebookEngine {

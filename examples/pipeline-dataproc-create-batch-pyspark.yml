@@ -29,6 +29,9 @@ actions:
   - pyspark:
       name: "run-pyspark-on-dataproc-serverless"
       mainFilePath: "./scripts/my_spark_job_with_pyfiles.py"
+      params:
+        var1: "value1"
+        var2: "value2"
       pyFiles:
         - "./scripts/lib1.py"
       engine:

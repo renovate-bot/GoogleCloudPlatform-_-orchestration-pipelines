@@ -509,6 +509,11 @@ class ConverterV1ToInternal:
                     resourceProfile=resource_profile
                 )
             )
+        params = (
+                    dict(action.params)
+                    if action.params
+                    else None
+                )
 
         return internal_actions.DataprocOperatorActionModel(
             name=action.name,
@@ -524,6 +529,7 @@ class ConverterV1ToInternal:
             triggerRule=self._convert_trigger_rule(action.trigger_rule),
             region=region,
             labels=labels,
+            params=params,
             impersonationChain=impersonation_chain,
             archives=list(action.archive_uris),
             depsBucket=action.staging_bucket,

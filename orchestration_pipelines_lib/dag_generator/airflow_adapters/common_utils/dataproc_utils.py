@@ -15,6 +15,7 @@
 """Module with all dataproc related client methods."""
 from __future__ import annotations
 
+import json
 import os
 from typing import TYPE_CHECKING, Any, Dict
 
@@ -79,18 +80,29 @@ def get_pyspark_batch_config(
         A dictionary representing the PySpark batch configuration.
     """
     pyspark_job = {}
+
     if action.type == "notebook":
         bucket_name = os.environ.get("GCS_BUCKET")
+        args = [action.filename, bucket_name, "{{ run_id }}"]
+        if action.params:
+            args.append(json.dumps(action.params))
+
         # Using run_notebook.py as a wrapper
         pyspark_job = {
             "main_python_file_uri": wrapper_uri,
-            "args": [action.filename, bucket_name, "{{ run_id }}"],
+            "args": args,
             "python_file_uris": action.pyFiles or [],
         }
     else:
+        args_list = []
+        if action.params:
+            for k, v in action.params.items():
+                args_list.extend([f"--{k}", str(v)])
+
         pyspark_job = {
             "main_python_file_uri": action.filename,
             "python_file_uris": action.pyFiles or [],
+            "args": args_list,
         }
 
     pyspark_job["archive_uris"] = action.archives or []

@@ -288,6 +288,7 @@ class TestConverterV1ToInternal(unittest.TestCase):
             name="dp-gce-existing",
             main_file_path="main.py",
             execution_timeout="3600s",
+            params={"param1": "value1"},
             engine=v1_protos.PysparkEngine(
                 dataproc_on_gce=v1_protos.DataprocOnGceEngine(
                     existing_cluster=(
@@ -314,6 +315,7 @@ class TestConverterV1ToInternal(unittest.TestCase):
         self.assertEqual(internal_gce_existing.impersonationChain,
                          ["sa@impersonate.com"])
         self.assertEqual(internal_gce_existing.executionTimeout, "3600s")
+        self.assertEqual(internal_gce_existing.params, {"param1": "value1"})
         self.assertEqual(internal_gce_existing.labels, self.labels)
 
     def test_convert_dataproc_gce_existing_cluster_action_with_defaults(self):
@@ -346,6 +348,7 @@ class TestConverterV1ToInternal(unittest.TestCase):
         notebook_gce_ephemeral = v1_protos.NotebookAction(
             name="dp-gce-ephemeral",
             main_file_path="main.ipynb",
+            params={"nb_param": "nb_val"},
             engine=v1_protos.
             NotebookEngine(dataproc_on_gce=v1_protos.DataprocOnGceEngine(
                 ephemeral_cluster=(v1_protos.DataprocEphemeralConfiguration(
@@ -368,6 +371,7 @@ class TestConverterV1ToInternal(unittest.TestCase):
         self.assertEqual(internal_gce_eph.config.properties, {"propB": "valB"})
         self.assertEqual(internal_gce_eph.config.cluster_config,
                          {"config_bucket": "some-bucket"})
+        self.assertEqual(internal_gce_eph.params, {"nb_param": "nb_val"})
         self.assertEqual(internal_gce_eph.labels, self.labels)
 
     def test_convert_dataproc_gce_ephemeral_path_config_action(self):
@@ -1029,6 +1033,7 @@ class TestConverterV1ToInternal(unittest.TestCase):
             internal_dts.config.runtimeParams,
             {"requested_run_time": {"seconds": 12345}},
         )
+        self.assertEqual(internal_dts.labels, self.labels)
 
     def test_convert_data_ingestion_action_defaults(self):
         """Tests DataIngestion action conversion falling back to defaults."""

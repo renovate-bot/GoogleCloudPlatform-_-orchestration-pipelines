@@ -88,7 +88,8 @@ class DataprocUtilsTest(unittest.TestCase):
                 'type': 'notebook',
                 'filename': 'my_analysis.ipynb',
                 'archives': ['gs://bucket/archive.zip'],
-                'pyFiles': []
+                'pyFiles': [],
+                'params': {'date': '2026-06-19'}
             })
 
         with patch.dict(os.environ, {"GCS_BUCKET": "example-bucket"}):
@@ -99,7 +100,7 @@ class DataprocUtilsTest(unittest.TestCase):
                              "gs://wrapper/run_notebook.py")
             self.assertEqual(
                 config["args"],
-                ["my_analysis.ipynb", "example-bucket", "{{ run_id }}"])
+                ["my_analysis.ipynb", "example-bucket", "{{ run_id }}", '{"date": "2026-06-19"}'])
             self.assertEqual(config["archive_uris"],
                              ["gs://bucket/archive.zip"])
 
@@ -112,7 +113,8 @@ class DataprocUtilsTest(unittest.TestCase):
                 'type': 'pyspark',
                 'filename': 'gs://bucket/script.py',
                 'archives': None,  # Testing the default empty list fallback
-                'pyFiles': []
+                'pyFiles': [],
+                'params': None
             })
 
         with patch.dict(os.environ, {"GCS_BUCKET": "example-bucket"}):
@@ -121,8 +123,7 @@ class DataprocUtilsTest(unittest.TestCase):
 
             self.assertEqual(config["main_python_file_uri"],
                              "gs://bucket/script.py")
-            self.assertNotIn(
-                "args", config)  # Scripts don't get the wrapper args injected
+            self.assertEqual(config.get("args", []), [])
             self.assertEqual(config["archive_uris"], [])
 
 

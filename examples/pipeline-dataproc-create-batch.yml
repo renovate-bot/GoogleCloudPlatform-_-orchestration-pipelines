@@ -37,6 +37,8 @@ actions:
   - notebook:
       name: "run-notebook-on-dataproc-serverless"
       mainFilePath: "./data/notebookWithArchivesCheck.ipynb"
+      params:
+        execution_date: "2026-01-01"
       archiveUris:
         - "./data/custom_venv.tar.gz"
       stagingBucket: "your-bucket"

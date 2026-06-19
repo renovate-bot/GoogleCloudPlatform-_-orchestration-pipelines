@@ -14,6 +14,7 @@
 #
 """Wrapper script for pyspark script."""
 
+import json
 import os
 import sys
 
@@ -23,6 +24,11 @@ print("Starting run_notebook.py")
 input_notebook = sys.argv[1]
 output_bucket = sys.argv[2]
 run_id = sys.argv[3]
+
+# Parse additional arguments as papermill parameters
+parameters = {}
+if len(sys.argv) > 4:
+    parameters = json.loads(sys.argv[4])
 
 file_name = os.path.basename(input_notebook)
 file_name, file_extension = os.path.splitext(file_name)
@@ -39,6 +45,7 @@ try:
     pm.execute_notebook(
         input_notebook,
         OUTPUT_PATH,
+        parameters=parameters,
         kernel_name="python3",
     )
     print(f"Finished notebook execution for {input_notebook}")

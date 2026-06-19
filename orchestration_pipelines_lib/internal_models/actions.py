@@ -117,6 +117,7 @@ class DataprocOperatorActionModel(ActionBaseModel):
     archives: Optional[List[str]] = None
     depsBucket: Optional[str] = None
     labels: Optional[Dict[str, str]] = None
+    params: Optional[Dict[str, str]] = None
     impersonationChain: Optional[Union[str, list[str]]] = None
     config: Union[
         DataprocGceExistingClusterConfigurationModel,
