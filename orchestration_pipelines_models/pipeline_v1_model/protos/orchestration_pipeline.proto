@@ -273,9 +273,13 @@ message PysparkEngine {
 }
 
 message PysparkEnvironment {
+  message InlineRequirements {
+    repeated string list = 1;
+  }
   message Requirements {
     oneof requirements {
       string path = 1;
+      InlineRequirements inline = 2;
     }
   }
   Requirements requirements = 1;
@@ -309,9 +313,13 @@ message NotebookEngine {
 }
 
 message NotebookEnvironment {
+  message InlineRequirements {
+    repeated string list = 1;
+  }
   message Requirements {
     oneof requirements {
       string path = 1;
+      InlineRequirements inline = 2;
     }
   }
   Requirements requirements = 1;
